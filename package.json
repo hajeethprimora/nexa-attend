@@ -1,0 +1,14 @@
+{
+  "name": "nexa-attend-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NexaAttend Attendance Management System - Decoupled 3-Tier Architecture",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix frontend",
+    "start:backend": "npm run start --prefix backend",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend"
+  }
+}
