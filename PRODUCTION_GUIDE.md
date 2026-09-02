@@ -1,68 +1,52 @@
-# NexaAttend Production Deployment & Operations Manual
+# NexaAttend Enterprise Production & Cloud Deployment Guide
 
-This guide provides end-to-end instructions for deploying and running **NexaAttend** in a production environment using Docker, Supabase PostgreSQL, Express API, and Next.js 14.
-
----
-
-## 1. Database Setup & Supabase Migration
-
-1. Open your **Supabase Project Dashboard** -> **SQL Editor**.
-2. Copy and execute the contents of [`schema.sql`](file:///c:/Users/Aashifa/OneDrive/Documents/GitHub/nexa-attend/schema.sql).
-3. This creates:
-   - `public.users`, `public.attendance`, `public.leaves`, `public.leave_balances`, and `public.audit_logs` tables.
-   - High-performance database indexes.
-   - Row-Level Security (RLS) policies ensuring users can only access their own attendance/leave data, while admins possess full management capabilities.
+This guide outlines step-by-step instructions for deploying NexaAttend (Backend & Frontend) to production environments such as **Render**, **Vercel**, or **AWS / Docker**.
 
 ---
 
-## 2. Environment Configuration
+## 🛠️ 1. Backend Deployment (Render / Railway / AWS)
 
-### Backend Setup (`backend/.env`):
-Copy `backend/.env.example` to `backend/.env` and update:
+### Cause of Previous Render Error:
+Render ran `yarn install` followed by `yarn start` (`node dist/server.js`), but because `dist/server.js` was not compiled during the install step, Node threw `Error: Cannot find module '/opt/render/project/src/backend/dist/server.js'`.
+
+### Fix Implemented:
+We added `"postinstall": "npm run build"` and moved `typescript` into production `dependencies`. Now, whenever Render runs `yarn install` or `npm install`, the backend automatically compiles `src/` to `dist/server.js`.
+
+### Render Service Settings:
+- **Root Directory**: `backend`
+- **Environment**: `Node`
+- **Build Command**: `yarn install && yarn build` (or `npm install && npm run build`)
+- **Start Command**: `yarn start` (or `node dist/server.js`)
+
+### Required Environment Variables (Render Dashboard):
 ```env
-PORT=5000
 NODE_ENV=production
-FRONTEND_URL=https://your-domain.com
-SUPABASE_URL=https://<your-project>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+PORT=5000
+SUPABASE_URL=https://your-supabase-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+FRONTEND_URL=https://your-frontend-domain.vercel.app
 ```
 
-### Frontend Setup (`frontend/.env.local`):
-Copy `frontend/.env.example` to `frontend/.env.local` and update:
+---
+
+## 🌐 2. Frontend Deployment (Vercel / Netlify)
+
+### Vercel Project Settings:
+- **Root Directory**: `frontend`
+- **Framework Preset**: `Next.js`
+- **Build Command**: `npm run build`
+- **Output Directory**: `.next`
+
+### Required Environment Variables (Vercel Dashboard):
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
-NEXT_PUBLIC_API_BASE_URL=https://api.your-domain.com/api
+NEXT_PUBLIC_API_URL=https://your-backend-service.onrender.com/api
+NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
 ---
 
-## 3. Local & Docker Production Deployment
+## 🗄️ 3. Database Migration (Supabase PostgreSQL)
 
-### Docker Compose Deployment (Recommended):
-To launch the complete decoupled stack with health checks:
-```bash
-docker-compose up -d --build
-```
-Verify status:
-```bash
-docker-compose ps
-```
-
----
-
-## 4. Running Automated Tests & Verification
-
-Execute the backend Jest integration test suite:
-```bash
-cd backend
-npm test
-```
-
----
-
-## 5. Security & Maintenance Best Practices
-
-1. **Rate Limiting**: Rate limiters are pre-configured on `/api/auth` (20 requests/15m) and general API endpoints (300 requests/15m).
-2. **Audit Logging**: All admin actions (creating employees, updating leave requests) and user attendance events are logged to `public.audit_logs`.
-3. **Structured Logs**: Application logs are stored in `backend/logs/combined.log` and `error.log`.
+Execute the updated [`schema.sql`](file:///c:/Users/Aashifa/OneDrive/Documents/GitHub/nexa-attend/schema.sql) in your Supabase project's SQL Editor to ensure all tables, indexes, shift schedule columns, overtime tracking, and Row Level Security (RLS) policies are active.
