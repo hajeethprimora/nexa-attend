@@ -16,7 +16,7 @@ export interface UserProfile {
   updated_at?: string;
 }
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request<any, any, any, any> {
   user?: UserProfile;
   requestId?: string;
 }
