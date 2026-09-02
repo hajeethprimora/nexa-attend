@@ -1,18 +1,19 @@
-const express = require('express');
-const router = express.Router();
-const {
+import express from 'express';
+import {
   getUsersStatus,
   getPendingLeaves,
   updateLeaveStatus,
   getMonthlyReport,
   getEmployees,
   createEmployee,
-  updateEmployee
-} = require('../controllers/adminController');
-const { authMiddleware, adminOnly } = require('../middleware/authMiddleware');
-const { validateLeaveApproval } = require('../validators/leaveValidators');
+  updateEmployee,
+  getAuditLogs
+} from '../controllers/adminController';
+import { authMiddleware, adminOnly } from '../middleware/authMiddleware';
+import { validateLeaveApproval } from '../validators/leaveValidators';
 
-// Protect all admin routes with authentication and admin role check
+const router = express.Router();
+
 router.use(authMiddleware, adminOnly);
 
 router.get('/users', getUsersStatus);
@@ -20,9 +21,9 @@ router.get('/leaves/pending', getPendingLeaves);
 router.put('/leaves/:id', validateLeaveApproval, updateLeaveStatus);
 router.get('/reports', getMonthlyReport);
 
-// Employee Management CRUD Routes
 router.get('/employees', getEmployees);
 router.post('/employees', createEmployee);
 router.put('/employees/:id', updateEmployee);
+router.get('/audit-logs', getAuditLogs);
 
-module.exports = router;
+export default router;

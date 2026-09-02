@@ -1,12 +1,15 @@
-const errorHandler = (err, req, res, next) => {
-  console.error('Unhandled Error Stack:', err.stack || err);
+const logger = require('../utils/logger');
 
-  const statusCode = err.statusCode || res.statusCode !== 200 ? res.statusCode : 500;
-  const message = err.message || 'Something went wrong on the server!';
+const errorHandler = (err, req, res, next) => {
+  logger.error(`[${req.method}] ${req.originalUrl} - Error: ${err.message}`, { stack: err.stack });
+
+  const statusCode = err.statusCode || (res.statusCode >= 400 ? res.statusCode : 500);
+  const message = err.message || 'Internal server error';
 
   res.status(statusCode).json({
     success: false,
-    message: message
+    message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 };
 

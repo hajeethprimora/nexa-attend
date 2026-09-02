@@ -1,36 +1,28 @@
-const supabase = require('../utils/supabaseClient');
-const logger = require('../utils/logger');
-const { logAuditEvent } = require('../utils/auditLogger');
-const { sendLeaveStatusNotification } = require('../utils/emailClient');
+import supabase from '../utils/supabaseClient';
+import logger from '../utils/logger';
+import { logAuditEvent } from '../utils/auditLogger';
+import { sendLeaveStatusNotification } from '../utils/emailClient';
+import { AppError } from '../middleware/errorHandler';
+import { calculateDays } from './leaveService';
+import { BreakEntry } from '../types';
 
-// Helper to calculate days between dates
-const calculateDays = (start, end) => {
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-};
-
-// GET /api/admin/users - Live team status view for Admin
-const getUsersStatus = async (req, res) => {
-  try {
+export class AdminService {
+  static async getUsersStatus() {
     const today = new Date().toISOString().split('T')[0];
 
-    // Fetch all active users
     const { data: users, error: usersError } = await supabase
       .from('users')
       .select('*')
       .order('full_name', { ascending: true });
 
-    if (usersError) throw usersError;
+    if (usersError) throw new AppError(usersError.message, 500, 'DB_ERROR');
 
-    // Fetch today's attendance records
     const { data: attendanceList, error: attError } = await supabase
       .from('attendance')
       .select('*')
       .eq('date', today);
 
-    if (attError) throw attError;
+    if (attError) throw new AppError(attError.message, 500, 'DB_ERROR');
 
     const attendanceMap = new Map();
     (attendanceList || []).forEach(att => {
@@ -41,12 +33,17 @@ const getUsersStatus = async (req, res) => {
       const att = attendanceMap.get(u.id);
       let status = 'Offline';
       let todayHours = 0;
+      let overtimeHours = 0;
+      let lateMinutes = 0;
 
       if (att) {
         todayHours = parseFloat(att.total_hours) || 0;
+        overtimeHours = parseFloat(att.overtime_hours) || 0;
+        lateMinutes = att.late_minutes || 0;
+
         if (att.clock_in && !att.clock_out) {
-          const breaks = Array.isArray(att.breaks) ? att.breaks : [];
-          const openBreak = breaks.find(b => b.start && !b.end);
+          const breaks: BreakEntry[] = Array.isArray(att.breaks) ? att.breaks : [];
+          const openBreak = breaks.find((b: BreakEntry) => b.start && !b.end);
           if (openBreak || (att.break_start && !att.break_end)) {
             status = 'On Break';
           } else {
@@ -63,36 +60,31 @@ const getUsersStatus = async (req, res) => {
         full_name: u.full_name,
         role: u.role,
         department: u.department || 'Engineering',
+        shift_start: u.shift_start || '09:00:00',
+        shift_end: u.shift_end || '17:00:00',
         is_active: u.is_active ?? true,
         status,
         today_hours: todayHours,
+        overtime_hours: overtimeHours,
+        late_minutes: lateMinutes,
         clock_in: att?.clock_in || null,
         clock_out: att?.clock_out || null
       };
     });
 
-    return res.status(200).json({
-      success: true,
-      data: userStatusList
-    });
-  } catch (error) {
-    logger.error('getUsersStatus Error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return userStatusList;
   }
-};
 
-// GET /api/admin/leaves/pending - Pending leave requests inbox
-const getPendingLeaves = async (req, res) => {
-  try {
+  static async getPendingLeaves() {
     const { data: leaves, error: leavesError } = await supabase
       .from('leaves')
       .select('*, users!user_id(full_name, employee_id, department)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
-    if (leavesError) throw leavesError;
+    if (leavesError) throw new AppError(leavesError.message, 500, 'DB_ERROR');
 
-    const formattedLeaves = (leaves || []).map(l => ({
+    return (leaves || []).map((l: any) => ({
       id: l.id,
       user_id: l.user_id,
       employee_id: l.users?.employee_id || 'N/A',
@@ -105,50 +97,32 @@ const getPendingLeaves = async (req, res) => {
       status: l.status,
       created_at: l.created_at
     }));
-
-    return res.status(200).json({
-      success: true,
-      data: formattedLeaves
-    });
-  } catch (error) {
-    logger.error('getPendingLeaves Error:', error);
-    return res.status(500).json({ success: false, message: error.message });
   }
-};
 
-// PUT /api/admin/leaves/:id - Approve or Reject leave request & update balance
-const updateLeaveStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, admin_comment } = req.body;
-    const adminId = req.user.id;
-
-    // 1. Fetch leave details
+  static async updateLeaveStatus(leaveId: string, status: 'approved' | 'rejected', adminComment: string, adminId: string, clientIp: string | null) {
     const { data: leave, error: leaveError } = await supabase
       .from('leaves')
       .select('*, users!user_id(full_name, employee_id)')
-      .eq('id', id)
+      .eq('id', leaveId)
       .single();
 
     if (leaveError || !leave) {
-      return res.status(404).json({ success: false, message: 'Leave request not found' });
+      throw new AppError('Leave request not found', 404, 'NOT_FOUND');
     }
 
-    // 2. Update leave status
     const { data: updatedLeave, error: updateError } = await supabase
       .from('leaves')
       .update({
         status,
-        admin_comment: admin_comment || '',
+        admin_comment: adminComment || '',
         reviewed_by: adminId
       })
-      .eq('id', id)
+      .eq('id', leaveId)
       .select('*, users!user_id(full_name, employee_id)')
       .single();
 
-    if (updateError) throw updateError;
+    if (updateError) throw new AppError(updateError.message, 500, 'DB_ERROR');
 
-    // 3. Deduct leave quota if approved
     if (status === 'approved') {
       const days = calculateDays(leave.start_date, leave.end_date);
       const currentYear = new Date(leave.start_date).getFullYear();
@@ -171,16 +145,14 @@ const updateLeaveStatus = async (req, res) => {
       }
     }
 
-    // 4. Audit Log & Email Notification
     await logAuditEvent({
       actor_id: adminId,
       action: `LEAVE_${status.toUpperCase()}`,
-      target_id: id,
-      ip_address: req.ip,
-      details: { status, admin_comment, user_id: leave.user_id }
+      target_id: leaveId,
+      ip_address: clientIp,
+      details: { status, admin_comment: adminComment, user_id: leave.user_id }
     });
 
-    // Fire email notification asynchronously
     sendLeaveStatusNotification({
       recipientEmail: leave.users?.email || `${leave.users?.employee_id}@company.com`,
       employeeName: leave.users?.full_name || 'Employee',
@@ -188,52 +160,35 @@ const updateLeaveStatus = async (req, res) => {
       startDate: leave.start_date,
       endDate: leave.end_date,
       status,
-      adminComment: admin_comment
+      adminComment
     });
 
-    return res.status(200).json({
-      success: true,
-      message: `Leave request ${status} successfully`,
-      data: updatedLeave
-    });
-  } catch (error) {
-    logger.error('updateLeaveStatus Error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return updatedLeave;
   }
-};
 
-// GET /api/admin/reports - Generate monthly summary report & CSV export
-const getMonthlyReport = async (req, res) => {
-  try {
-    const month = req.query.month || new Date().toISOString().slice(0, 7); // Default YYYY-MM
-    const format = req.query.format;
-    const departmentFilter = req.query.department;
-    const searchQuery = req.query.search?.toLowerCase() || '';
-
+  static async getMonthlyReport(monthStr?: string, departmentFilter?: string, searchQuery?: string) {
+    const month = monthStr || new Date().toISOString().slice(0, 7);
     const startDate = `${month}-01`;
-    const [yearStr, monthStr] = month.split('-');
+    const [yearStr, monthNumStr] = month.split('-');
     const year = parseInt(yearStr);
-    const monthNum = parseInt(monthStr);
+    const monthNum = parseInt(monthNumStr);
     const lastDay = new Date(year, monthNum, 0).getDate();
     const endDate = `${month}-${lastDay.toString().padStart(2, '0')}`;
 
-    // Fetch users
     let usersQuery = supabase.from('users').select('*').order('full_name', { ascending: true });
     if (departmentFilter) usersQuery = usersQuery.eq('department', departmentFilter);
 
     const { data: users, error: usersError } = await usersQuery;
-    if (usersError) throw usersError;
+    if (usersError) throw new AppError(usersError.message, 500, 'DB_ERROR');
 
-    // Fetch monthly attendance
     const { data: attendanceList, error: attError } = await supabase
       .from('attendance')
       .select('*')
       .gte('date', startDate)
       .lte('date', endDate);
 
-    if (attError) throw attError;
+    if (attError) throw new AppError(attError.message, 500, 'DB_ERROR');
 
-    // Fetch monthly leaves
     const { data: leavesList, error: leavesError } = await supabase
       .from('leaves')
       .select('*')
@@ -241,15 +196,16 @@ const getMonthlyReport = async (req, res) => {
       .gte('start_date', startDate)
       .lte('end_date', endDate);
 
-    if (leavesError) throw leavesError;
+    if (leavesError) throw new AppError(leavesError.message, 500, 'DB_ERROR');
 
-    // Aggregate report data
     let reportData = (users || []).map(u => {
       const userAtt = (attendanceList || []).filter(a => a.user_id === u.id);
       const userLeaves = (leavesList || []).filter(l => l.user_id === u.id);
 
       const totalDaysWorked = userAtt.filter(a => a.clock_in).length;
       const totalHoursWorked = userAtt.reduce((sum, a) => sum + (parseFloat(a.total_hours) || 0), 0);
+      const totalOvertime = userAtt.reduce((sum, a) => sum + (parseFloat(a.overtime_hours) || 0), 0);
+      const totalLateMinutes = userAtt.reduce((sum, a) => sum + (a.late_minutes || 0), 0);
       const totalLeavesTaken = userLeaves.length;
 
       return {
@@ -260,51 +216,31 @@ const getMonthlyReport = async (req, res) => {
         role: u.role,
         total_days_worked: totalDaysWorked,
         total_hours_worked: Math.round((totalHoursWorked + Number.EPSILON) * 100) / 100,
+        total_overtime_hours: Math.round((totalOvertime + Number.EPSILON) * 100) / 100,
+        total_late_minutes: totalLateMinutes,
         leaves_taken: totalLeavesTaken
       };
     });
 
     if (searchQuery) {
-      reportData = reportData.filter(r => 
-        r.full_name.toLowerCase().includes(searchQuery) || 
-        r.employee_id.toLowerCase().includes(searchQuery)
+      const q = searchQuery.toLowerCase();
+      reportData = reportData.filter(r =>
+        r.full_name.toLowerCase().includes(q) ||
+        r.employee_id.toLowerCase().includes(q)
       );
     }
 
-    if (format === 'csv') {
-      let csvContent = 'Employee ID,Full Name,Department,Role,Total Working Days,Total Working Hours,Leaves Taken\n';
-      reportData.forEach(row => {
-        csvContent += `"${row.employee_id}","${row.full_name}","${row.department}","${row.role}",${row.total_days_worked},${row.total_hours_worked},${row.leaves_taken}\n`;
-      });
-
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=nexaattend_report_${month}.csv`);
-      return res.status(200).send(csvContent);
-    }
-
-    return res.status(200).json({
-      success: true,
-      month,
-      data: reportData
-    });
-  } catch (error) {
-    logger.error('getMonthlyReport Error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return { month, reportData };
   }
-};
 
-// GET /api/admin/employees - Full Employee CRUD List
-const getEmployees = async (req, res) => {
-  try {
-    const { search, department, role } = req.query;
-
+  static async getEmployees(search?: string, department?: string, role?: string) {
     let query = supabase.from('users').select('*').order('created_at', { ascending: false });
 
     if (department) query = query.eq('department', department);
     if (role) query = query.eq('role', role);
 
     const { data: users, error } = await query;
-    if (error) throw error;
+    if (error) throw new AppError(error.message, 500, 'DB_ERROR');
 
     let result = users || [];
     if (search) {
@@ -312,29 +248,16 @@ const getEmployees = async (req, res) => {
       result = result.filter(u => u.full_name?.toLowerCase().includes(q) || u.employee_id?.toLowerCase().includes(q));
     }
 
-    return res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    logger.error('getEmployees Error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return result;
   }
-};
 
-// POST /api/admin/employees - Create New Employee Profile
-const createEmployee = async (req, res) => {
-  try {
-    const { email, password, employee_id, full_name, department, role } = req.body;
+  static async createEmployee(payload: any, adminId: string, clientIp: string | null) {
+    const { email, password, employee_id, full_name, department, role, shift_start, shift_end } = payload;
 
     if (!email || !password || !employee_id || !full_name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email, password, employee ID, and full name are required.'
-      });
+      throw new AppError('Email, password, employee ID, and full name are required.', 400, 'VALIDATION_ERROR');
     }
 
-    // 1. Create auth user in Supabase Auth via Admin Client API
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -343,12 +266,11 @@ const createEmployee = async (req, res) => {
     });
 
     if (authError) {
-      return res.status(400).json({ success: false, message: authError.message });
+      throw new AppError(authError.message, 400, 'AUTH_CREATE_ERROR');
     }
 
     const newUserId = authData.user.id;
 
-    // 2. Insert into public.users
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .insert([{
@@ -357,6 +279,8 @@ const createEmployee = async (req, res) => {
         full_name,
         role: role || 'employee',
         department: department || 'Engineering',
+        shift_start: shift_start || '09:00:00',
+        shift_end: shift_end || '17:00:00',
         is_active: true
       }])
       .select()
@@ -366,7 +290,6 @@ const createEmployee = async (req, res) => {
       logger.error('Error creating public.users record:', profileError);
     }
 
-    // 3. Initialize leave balances for current year
     const currentYear = new Date().getFullYear();
     await supabase.from('leave_balances').insert([{
       user_id: newUserId,
@@ -377,29 +300,18 @@ const createEmployee = async (req, res) => {
     }]);
 
     await logAuditEvent({
-      actor_id: req.user.id,
+      actor_id: adminId,
       action: 'EMPLOYEE_CREATED',
       target_id: newUserId,
-      ip_address: req.ip,
+      ip_address: clientIp,
       details: { email, employee_id, full_name, role, department }
     });
 
-    return res.status(201).json({
-      success: true,
-      message: 'Employee created successfully',
-      data: userProfile || { id: newUserId, employee_id, full_name, role, department }
-    });
-  } catch (error) {
-    logger.error('createEmployee Error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return userProfile || { id: newUserId, employee_id, full_name, role, department };
   }
-};
 
-// PUT /api/admin/employees/:id - Update Employee Details
-const updateEmployee = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { employee_id, full_name, department, role, is_active } = req.body;
+  static async updateEmployee(employeeId: string, payload: any, adminId: string, clientIp: string | null) {
+    const { employee_id, full_name, department, role, shift_start, shift_end, is_active } = payload;
 
     const { data, error } = await supabase
       .from('users')
@@ -408,39 +320,36 @@ const updateEmployee = async (req, res) => {
         full_name,
         department,
         role,
-        is_active
+        shift_start: shift_start || '09:00:00',
+        shift_end: shift_end || '17:00:00',
+        is_active,
+        updated_at: new Date().toISOString()
       })
-      .eq('id', id)
+      .eq('id', employeeId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) throw new AppError(error.message, 500, 'DB_ERROR');
 
     await logAuditEvent({
-      actor_id: req.user.id,
+      actor_id: adminId,
       action: 'EMPLOYEE_UPDATED',
-      target_id: id,
-      ip_address: req.ip,
+      target_id: employeeId,
+      ip_address: clientIp,
       details: { employee_id, full_name, department, role, is_active }
     });
 
-    return res.status(200).json({
-      success: true,
-      message: 'Employee updated successfully',
-      data
-    });
-  } catch (error) {
-    logger.error('updateEmployee Error:', error);
-    return res.status(500).json({ success: false, message: error.message });
+    return data;
   }
-};
 
-module.exports = {
-  getUsersStatus,
-  getPendingLeaves,
-  updateLeaveStatus,
-  getMonthlyReport,
-  getEmployees,
-  createEmployee,
-  updateEmployee
-};
+  static async getAuditLogs(limit: number = 50) {
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*, users!actor_id(full_name, employee_id)')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw new AppError(error.message, 500, 'DB_ERROR');
+    return data || [];
+  }
+}
