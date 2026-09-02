@@ -1,5 +1,5 @@
-import express from 'express';
-import cors from 'cors';
+import express, { Request, Response } from 'express';
+import cors, { CorsOptions } from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
@@ -31,18 +31,20 @@ const allowedOrigins = [
   'http://127.0.0.1:3000'
 ];
 
-app.use(cors({
+const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin as string)) {
       callback(null, true);
     } else {
-      callback(null, true);
+      callback(null, false);
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
-}));
+};
+
+app.use(cors(corsOptions));
 
 // 3. Request Rate Limiting
 const authLimiter = rateLimit({
@@ -68,7 +70,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(requestLogger);
 
 // 6. Production Health Check Endpoint
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (req: Request, res: Response) => {
   return sendSuccess(res, {
     status: 'healthy',
     uptime: process.uptime(),
