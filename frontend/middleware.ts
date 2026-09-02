@@ -3,18 +3,22 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(req: NextRequest) {
   const res = NextResponse.next();
-  const token = req.cookies.get('sb-access-token')?.value || req.cookies.get('supabase-auth-token')?.value;
+  const token = req.cookies.get('sb-access-token')?.value || 
+                req.cookies.get('supabase-auth-token')?.value ||
+                req.cookies.get('nexa_token')?.value;
 
   const isAuthPage = req.nextUrl.pathname.startsWith('/login');
-  const isDashboardPage = req.nextUrl.pathname.startsWith('/dashboard') || req.nextUrl.pathname.startsWith('/admin');
+  const isProtectedPage = req.nextUrl.pathname.startsWith('/dashboard') || req.nextUrl.pathname.startsWith('/admin');
 
-  // If trying to access protected route without token, redirect to login
-  if (!token && isDashboardPage) {
-    // Note: Client-side AuthContext also performs backup route protection
-    // return NextResponse.redirect(new URL('/login', req.url));
+  // Server-side redirect for unauthenticated requests to protected pages
+  if (!token && isProtectedPage) {
+    // If cookie is absent, allow client-side AuthContext fallback check or redirect
+    // Uncommenting below enforces hard SSR redirection when auth cookie strategy is fully deployed
+    // const loginUrl = new URL('/login', req.url);
+    // return NextResponse.redirect(loginUrl);
   }
 
-  // If already authenticated and on login page, redirect to dashboard
+  // Redirect away from login page if already holding auth token
   if (token && isAuthPage) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }

@@ -2,53 +2,61 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../lib/axiosInstance';
 import StatusCard from '../../../components/dashboard/StatusCard';
 import ClockButtons from '../../../components/dashboard/ClockButtons';
 import HistoryTable from '../../../components/dashboard/HistoryTable';
 import LeaveModal from '../../../components/dashboard/LeaveModal';
+import { UserAttendanceChart } from '../../../components/analytics/AttendanceCharts';
 import Button from '../../../components/ui/Button';
 import Toast from '../../../components/ui/Toast';
+import { AttendanceRecord, LeaveBalance, LeaveRequest } from '../../../types';
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [todayRecord, setTodayRecord] = useState(null);
-  const [status, setStatus] = useState('Offline');
-  const [historyRecords, setHistoryRecords] = useState([]);
-  const [historySummary, setHistorySummary] = useState(null);
-  const [userLeaves, setUserLeaves] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
-  const [isLoadingAction, setIsLoadingAction] = useState(false);
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
+  const [status, setStatus] = useState<string>('Offline');
+  const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
+  const [historySummary, setHistorySummary] = useState<any>(null);
+  const [userLeaves, setUserLeaves] = useState<LeaveRequest[]>([]);
+  const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState<boolean>(false);
+  const [isLoadingAction, setIsLoadingAction] = useState<boolean>(false);
 
-  const [toast, setToast] = useState({ message: '', type: 'info' });
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' }>({
+    message: '',
+    type: 'info'
+  });
 
-  const showToast = (message, type = 'info') => {
+  const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToast({ message, type });
   };
 
   const fetchTodayStatus = useCallback(async () => {
     try {
       const response = await api.get('/attendance/today');
-      if (response.data?.success) {
-        setTodayRecord(response.data.data);
-        setStatus(response.data.status || 'Offline');
+      const resData = response.data;
+      if (resData?.success) {
+        setTodayRecord(resData.data);
+        setStatus(resData.meta?.status || resData.status || 'Offline');
       }
     } catch (err) {
       console.error('Error fetching today status:', err);
     }
   }, []);
 
-  const fetchHistory = useCallback(async (month) => {
+  const fetchHistory = useCallback(async (month: string) => {
     try {
       const response = await api.get(`/attendance/history?month=${month}`);
-      if (response.data?.success) {
-        setHistoryRecords(response.data.data || []);
-        setHistorySummary(response.data.summary);
+      const resData = response.data;
+      if (resData?.success) {
+        setHistoryRecords(resData.data || []);
+        setHistorySummary(resData.meta?.summary || resData.summary);
       }
     } catch (err) {
       console.error('Error fetching history:', err);
@@ -58,8 +66,10 @@ export default function DashboardPage() {
   const fetchLeaves = useCallback(async () => {
     try {
       const response = await api.get('/leaves');
-      if (response.data?.success) {
-        setUserLeaves(response.data.data || []);
+      const resData = response.data;
+      if (resData?.success) {
+        setUserLeaves(resData.data || []);
+        setLeaveBalance(resData.meta?.balance || resData.balance || null);
       }
     } catch (err) {
       console.error('Error fetching leaves:', err);
@@ -90,7 +100,7 @@ export default function DashboardPage() {
         await fetchTodayStatus();
         await fetchHistory(selectedMonth);
       }
-    } catch (err) {
+    } catch (err: any) {
       showToast(err.response?.data?.message || 'Failed to clock in', 'error');
     } finally {
       setIsLoadingAction(false);
@@ -105,7 +115,7 @@ export default function DashboardPage() {
         showToast('Break started', 'info');
         await fetchTodayStatus();
       }
-    } catch (err) {
+    } catch (err: any) {
       showToast(err.response?.data?.message || 'Failed to start break', 'error');
     } finally {
       setIsLoadingAction(false);
@@ -120,7 +130,7 @@ export default function DashboardPage() {
         showToast('Break ended', 'success');
         await fetchTodayStatus();
       }
-    } catch (err) {
+    } catch (err: any) {
       showToast(err.response?.data?.message || 'Failed to end break', 'error');
     } finally {
       setIsLoadingAction(false);
@@ -137,7 +147,7 @@ export default function DashboardPage() {
         await fetchTodayStatus();
         await fetchHistory(selectedMonth);
       }
-    } catch (err) {
+    } catch (err: any) {
       showToast(err.response?.data?.message || 'Failed to clock out', 'error');
     } finally {
       setIsLoadingAction(false);
@@ -147,7 +157,7 @@ export default function DashboardPage() {
   if (authLoading || !user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -162,20 +172,20 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
-            Hello, {user.full_name} 👋
+            Welcome back, {user.full_name} 👋
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {user.employee_id} • {user.department} Department
+            {user.employee_id} • {user.department} Department • Shift ({user.shift_start?.slice(0, 5) || '09:00'} - {user.shift_end?.slice(0, 5) || '17:00'})
           </p>
         </div>
 
         <Button
           variant="outline"
           onClick={() => setIsLeaveModalOpen(true)}
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto font-bold"
         >
           <Plus className="w-4 h-4 mr-2" />
-          <span>Leave Request</span>
+          <span>Apply for Leave</span>
         </Button>
       </div>
 
@@ -184,6 +194,7 @@ export default function DashboardPage() {
         todayHours={todayHours}
         weekHours={weekHours}
         pendingLeavesCount={pendingLeavesCount}
+        leaveBalance={leaveBalance}
       />
 
       {/* Interactive Clock Action Panel */}
@@ -197,12 +208,16 @@ export default function DashboardPage() {
         isLoading={isLoadingAction}
       />
 
+      {/* Visual Analytics Chart */}
+      <UserAttendanceChart records={historyRecords} />
+
       {/* Monthly Attendance Log Table */}
       <HistoryTable
         records={historyRecords}
         selectedMonth={selectedMonth}
         onMonthChange={setSelectedMonth}
         summary={historySummary}
+        currentUser={user}
       />
 
       {/* Leave Application & History Modal */}
