@@ -22,11 +22,13 @@ export const login = async (req: AuthenticatedRequest, res: Response) => {
       return sendError(res, authError?.message || 'Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
-    const { data: userData } = await supabase
+    const { data: userRows } = await supabase
       .from('users')
       .select('*')
       .eq('id', authData.user.id)
-      .maybeSingle();
+      .limit(1);
+
+    const userData = userRows?.[0] || null;
 
     const userProfile = userData || {
       id: authData.user.id,
@@ -64,7 +66,6 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
 
     let userId: string;
 
-    // Try admin createUser to bypass email verification block for production usability
     const { data: adminAuthData, error: adminAuthError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -80,7 +81,6 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
     if (!adminAuthError && adminAuthData?.user) {
       userId = adminAuthData.user.id;
     } else {
-      // Fallback to standard signUp
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -100,7 +100,6 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
       userId = authData.user.id;
     }
 
-    // Insert public.users record
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .upsert({
@@ -120,7 +119,6 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
       logger.error('Error inserting public.users profile during signup:', profileError);
     }
 
-    // Initialize leave balance
     const currentYear = new Date().getFullYear();
     await supabase.from('leave_balances').upsert({
       user_id: userId,
@@ -141,7 +139,6 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
       details: { email, full_name, employee_id: empId, department: userDepartment }
     });
 
-    // Sign in to establish active session
     const { data: signInData } = await supabase.auth.signInWithPassword({ email, password });
 
     return sendSuccess(res, {

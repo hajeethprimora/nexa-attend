@@ -18,11 +18,13 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
       return sendError(res, 'Unauthorized: Invalid or expired token', 401, 'UNAUTHORIZED');
     }
 
-    const { data: userData } = await supabase
+    const { data: userRows, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('id', authData.user.id)
-      .maybeSingle();
+      .limit(1);
+
+    const userData = userRows?.[0] || null;
 
     const userProfile: UserProfile = userData
       ? {
