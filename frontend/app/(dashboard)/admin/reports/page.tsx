@@ -75,7 +75,7 @@ export default function ReportsPage() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `nexaattend_report_${selectedMonth}.csv`);
+      link.setAttribute('download', `softnix_report_${selectedMonth}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -111,68 +111,68 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
         <div className="flex items-center space-x-3">
           <button
             onClick={() => router.push('/admin')}
-            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
+            <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
               Payroll & Attendance Reports
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
               Generate corporate team summary reports and export payroll-ready CSV and PDF files
             </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2.5 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={handleExportPDF}
-            className="w-full sm:w-auto font-bold"
+            className="w-full sm:w-auto font-bold text-xs sm:text-sm justify-center py-2.5"
           >
-            <Printer className="w-4 h-4 mr-2" />
-            <span>Export Executive PDF</span>
+            <Printer className="w-4 h-4 mr-1.5" />
+            <span>PDF Report</span>
           </Button>
 
           <Button
             variant="success"
             onClick={handleExportCSV}
             isLoading={isExporting}
-            className="w-full sm:w-auto font-bold"
+            className="w-full sm:w-auto font-bold text-xs sm:text-sm justify-center py-2.5"
           >
-            <Download className="w-4 h-4 mr-2" />
-            <span>Export Payroll CSV</span>
+            <Download className="w-4 h-4 mr-1.5" />
+            <span>CSV Export</span>
           </Button>
         </div>
       </div>
 
       {/* Advanced Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+          <label className="block text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
             Month Period
           </label>
           <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-2xl text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+            className="w-full px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+          <label className="block text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
             Department
           </label>
           <select
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-2xl text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+            className="w-full px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
           >
             <option value="">All Departments</option>
             <option value="Engineering">Engineering</option>
@@ -186,7 +186,7 @@ export default function ReportsPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+          <label className="block text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
             Search Employee
           </label>
           <div className="relative">
@@ -196,32 +196,32 @@ export default function ReportsPage() {
               placeholder="Search by name or ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+              className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
             />
           </div>
         </div>
       </div>
 
       {/* Aggregate Overview Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-3xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900">
-          <p className="text-xs font-bold uppercase text-indigo-700 dark:text-indigo-400">Total Worked Hours</p>
-          <p className="text-2xl font-black text-indigo-900 dark:text-indigo-100 mt-1">{grandTotalHours.toFixed(1)} hrs</p>
+          <p className="text-[10px] sm:text-xs font-bold uppercase text-indigo-700 dark:text-indigo-400">Total Worked</p>
+          <p className="text-xl sm:text-2xl font-black text-indigo-900 dark:text-indigo-100 mt-1">{grandTotalHours.toFixed(1)} hrs</p>
         </div>
 
         <div className="p-4 rounded-3xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900">
-          <p className="text-xs font-bold uppercase text-rose-700 dark:text-rose-400">Total Overtime Hours</p>
-          <p className="text-2xl font-black text-rose-900 dark:text-rose-100 mt-1">{grandTotalOvertime.toFixed(1)} hrs</p>
+          <p className="text-[10px] sm:text-xs font-bold uppercase text-rose-700 dark:text-rose-400">Total Overtime</p>
+          <p className="text-xl sm:text-2xl font-black text-rose-900 dark:text-rose-100 mt-1">{grandTotalOvertime.toFixed(1)} hrs</p>
         </div>
 
         <div className="p-4 rounded-3xl bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900">
-          <p className="text-xs font-bold uppercase text-teal-700 dark:text-teal-400">Total Working Days</p>
-          <p className="text-2xl font-black text-teal-900 dark:text-teal-100 mt-1">{grandTotalDays} Days</p>
+          <p className="text-[10px] sm:text-xs font-bold uppercase text-teal-700 dark:text-teal-400">Work Days</p>
+          <p className="text-xl sm:text-2xl font-black text-teal-900 dark:text-teal-100 mt-1">{grandTotalDays} Days</p>
         </div>
 
         <div className="p-4 rounded-3xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900">
-          <p className="text-xs font-bold uppercase text-amber-700 dark:text-amber-400">Approved Leaves</p>
-          <p className="text-2xl font-black text-amber-900 dark:text-amber-100 mt-1">{grandTotalLeaves} Days</p>
+          <p className="text-[10px] sm:text-xs font-bold uppercase text-amber-700 dark:text-amber-400">Approved Leaves</p>
+          <p className="text-xl sm:text-2xl font-black text-amber-900 dark:text-amber-100 mt-1">{grandTotalLeaves} Days</p>
         </div>
       </div>
 
@@ -230,8 +230,8 @@ export default function ReportsPage() {
         header={
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-indigo-500" />
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              <FileText className="w-5 h-5 text-indigo-500 shrink-0" />
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
                 Monthly Breakdown ({selectedMonth})
               </h3>
             </div>
@@ -241,7 +241,51 @@ export default function ReportsPage() {
           </div>
         }
       >
-        <div className="overflow-x-auto -mx-6">
+        {/* Mobile Stacked Report Cards (< 640px) */}
+        <div className="block sm:hidden space-y-3">
+          {isLoading ? (
+            <div className="py-8 text-center text-xs text-gray-400">Loading report summary...</div>
+          ) : reportData.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-400">No attendance records found.</div>
+          ) : (
+            reportData.map((row) => (
+              <div
+                key={row.employee_id}
+                className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">{row.full_name}</h4>
+                    <p className="text-xs text-gray-400 font-mono">{row.employee_id} • {row.department}</p>
+                  </div>
+                  <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{row.total_hours_worked.toFixed(1)} hrs</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-200/60 dark:border-gray-700/60 text-center text-xs">
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Days Worked</span>
+                    <span className="font-semibold text-gray-800 dark:text-gray-200">{row.total_days_worked}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Leaves</span>
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">{row.leaves_taken}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Overtime</span>
+                    <span className="font-semibold text-rose-500">
+                      {row.total_overtime_hours && row.total_overtime_hours > 0 ? `${row.total_overtime_hours.toFixed(1)}h` : '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto -mx-6">
           <div className="inline-block min-w-full align-middle px-6">
             <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
               <thead>

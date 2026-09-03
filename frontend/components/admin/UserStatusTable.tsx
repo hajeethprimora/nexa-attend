@@ -12,16 +12,62 @@ export const UserStatusTable: React.FC<UserStatusTableProps> = ({ users, isLoadi
   return (
     <Card
       header={
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Live Team Presence Monitor</h3>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">Live Team Presence Monitor</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">Real-time working state of organization employees</p>
           </div>
-          <Badge variant="info">{users.length} Total Workforce</Badge>
+          <div className="self-start sm:self-auto">
+            <Badge variant="info">{users.length} Total Workforce</Badge>
+          </div>
         </div>
       }
     >
-      <div className="overflow-x-auto -mx-6">
+      {/* Mobile Stacked Card View (< 640px) */}
+      <div className="block sm:hidden space-y-3">
+        {isLoading ? (
+          <div className="py-8 text-center text-xs text-gray-400">Loading team status data...</div>
+        ) : users.length === 0 ? (
+          <div className="py-8 text-center text-xs text-gray-400">No active employees registered.</div>
+        ) : (
+          users.map((u) => (
+            <div
+              key={u.id}
+              className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">{u.full_name}</h4>
+                  <p className="text-xs text-gray-400 font-mono">{u.employee_id} • {u.department}</p>
+                </div>
+                <Badge variant={u.status}>{u.status}</Badge>
+              </div>
+
+              <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/60 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Shift</span>
+                  <span className="font-mono text-gray-700 dark:text-gray-300">
+                    {u.shift_start?.slice(0, 5) || '09:00'} - {u.shift_end?.slice(0, 5) || '17:00'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Today Worked</span>
+                  <span className="font-black text-indigo-600 dark:text-indigo-400">{u.today_hours.toFixed(1)} hrs</span>
+                </div>
+                {u.overtime_hours && u.overtime_hours > 0 ? (
+                  <div className="text-right">
+                    <span className="text-gray-400 block text-[10px] uppercase font-bold">Overtime</span>
+                    <span className="font-bold text-rose-500">{u.overtime_hours.toFixed(1)} hrs</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Table View (>= 640px) */}
+      <div className="hidden sm:block overflow-x-auto -mx-6">
         <div className="inline-block min-w-full align-middle px-6">
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
             <thead>

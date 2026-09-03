@@ -117,15 +117,15 @@ export default function EmployeeManagementPage() {
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
         <div>
           <div className="flex items-center space-x-2">
-            <UserPlus className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
+            <UserPlus className="w-6 h-6 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
               Workforce Directory Management
             </h1>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
             Manage organization employee profiles, roles, shift schedules, and access states
           </p>
         </div>
@@ -136,7 +136,7 @@ export default function EmployeeManagementPage() {
             setSelectedEmployee(null);
             setModalOpen(true);
           }}
-          className="font-bold"
+          className="w-full sm:w-auto font-bold py-2.5"
         >
           <UserPlus className="w-4 h-4 mr-2" />
           <span>Add New Employee</span>
@@ -144,7 +144,7 @@ export default function EmployeeManagementPage() {
       </div>
 
       {/* Controls & Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-gray-400" />
           <input
@@ -152,16 +152,16 @@ export default function EmployeeManagementPage() {
             placeholder="Search employee by name or ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
+          <Filter className="w-4 h-4 text-gray-400 shrink-0" />
           <select
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
-            className="px-4 py-2.5 rounded-2xl text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-2xl text-xs sm:text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="">All Departments</option>
             <option value="Engineering">Engineering</option>
@@ -179,13 +179,91 @@ export default function EmployeeManagementPage() {
       <Card
         header={
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
               Active Directory ({employees.length})
             </h3>
           </div>
         }
       >
-        <div className="overflow-x-auto -mx-6">
+        {/* Mobile Stacked Employee Directory Cards (< 640px) */}
+        <div className="block sm:hidden space-y-3">
+          {isLoading ? (
+            <div className="py-8 text-center text-xs text-gray-400">Loading employee directory...</div>
+          ) : employees.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-400">No matching employee records found.</div>
+          ) : (
+            employees.map((emp) => (
+              <div
+                key={emp.id}
+                className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">{emp.full_name}</h4>
+                    <p className="text-xs text-gray-400 font-mono">{emp.employee_id} • {emp.department}</p>
+                  </div>
+                  <Badge variant={emp.role}>{emp.role}</Badge>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
+                  <div className="flex items-center text-gray-500 font-mono">
+                    <Clock className="w-3.5 h-3.5 mr-1 text-indigo-500" />
+                    {emp.shift_start?.slice(0, 5) || '09:00'} - {emp.shift_end?.slice(0, 5) || '17:00'}
+                  </div>
+
+                  {emp.is_active ?? true ? (
+                    <span className="inline-flex items-center text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <CheckCircle className="w-3 h-3 mr-1" /> Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center text-[10px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full border border-rose-200">
+                      <XCircle className="w-3 h-3 mr-1" /> Inactive
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {emp.id !== user.id && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleToggleRole(emp)}
+                      className="w-full text-xs justify-center"
+                    >
+                      {emp.role === 'admin' ? (
+                        <>
+                          <ShieldAlert className="w-3.5 h-3.5 mr-1 text-amber-500" />
+                          <span>Demote</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5 mr-1 text-indigo-500" />
+                          <span>Make Admin</span>
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedEmployee(emp);
+                      setModalOpen(true);
+                    }}
+                    className={`w-full text-xs justify-center ${emp.id === user.id ? 'col-span-2' : ''}`}
+                  >
+                    <Edit className="w-3.5 h-3.5 mr-1" />
+                    <span>Edit Profile</span>
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table View (>= 640px) */}
+        <div className="hidden sm:block overflow-x-auto -mx-6">
           <div className="inline-block min-w-full align-middle px-6">
             <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
               <thead>
@@ -245,7 +323,6 @@ export default function EmployeeManagementPage() {
                         )}
                       </td>
                       <td className="py-3.5 text-right space-x-2">
-                        {/* 1-Click Make Admin / Revoke Admin Quick Action Button */}
                         {emp.id !== user.id && (
                           <Button
                             variant="secondary"

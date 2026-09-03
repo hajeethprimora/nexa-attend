@@ -81,7 +81,7 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={employee ? `Edit Employee: ${employee.full_name}` : 'Add New Employee Profile'}
+      title={employee ? `Edit Profile: ${employee.full_name}` : 'Add New Employee Profile'}
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,7 +109,7 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="john@company.com"
+              placeholder="john@softnix.com"
               required
             />
             <Input
@@ -190,11 +190,11 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
           </div>
         )}
 
-        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <div className="grid grid-cols-2 sm:flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+          <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto justify-center">
             Cancel
           </Button>
-          <Button type="submit" variant="primary" isLoading={isSubmitting}>
+          <Button type="submit" variant="primary" isLoading={isSubmitting} className="w-full sm:w-auto justify-center font-bold">
             {employee ? 'Update Profile' : 'Create Profile'}
           </Button>
         </div>

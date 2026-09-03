@@ -58,12 +58,12 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Leave Application & History" maxWidth="lg">
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Navigation Tabs */}
         <div className="flex border-b border-gray-100 dark:border-gray-800">
           <button
             onClick={() => setActiveTab('apply')}
-            className={`pb-3 px-4 text-sm font-bold border-b-2 transition-colors ${
+            className={`pb-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors ${
               activeTab === 'apply'
                 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
                 : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
@@ -73,7 +73,7 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`pb-3 px-4 text-sm font-bold border-b-2 transition-colors ${
+            className={`pb-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors ${
               activeTab === 'history'
                 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
                 : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
@@ -136,40 +136,38 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
               />
             </div>
 
-            <div className="flex justify-end space-x-3 pt-2">
-              <Button type="button" variant="outline" onClick={onClose}>
+            <div className="grid grid-cols-2 sm:flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto justify-center">
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" isLoading={isSubmitting}>
+              <Button type="submit" variant="primary" isLoading={isSubmitting} className="w-full sm:w-auto justify-center font-bold">
                 Submit Application
               </Button>
             </div>
           </form>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             {leaves.length === 0 ? (
               <p className="text-center py-8 text-sm text-gray-400">No leave requests submitted yet.</p>
             ) : (
               leaves.map((l) => (
                 <div
                   key={l.id}
-                  className="p-4 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-between"
+                  className="p-4 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 space-y-2"
                 >
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-bold text-gray-900 dark:text-gray-100 capitalize">{l.type} Leave</span>
-                      <Badge variant={l.status}>{l.status}</Badge>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {l.start_date} to {l.end_date}
-                    </p>
-                    {l.reason && <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 italic">"{l.reason}"</p>}
-                    {l.admin_comment && (
-                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1 font-semibold">
-                        Admin Note: {l.admin_comment}
-                      </p>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100 capitalize">{l.type} Leave</span>
+                    <Badge variant={l.status}>{l.status}</Badge>
                   </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                    {l.start_date} to {l.end_date}
+                  </p>
+                  {l.reason && <p className="text-xs text-gray-600 dark:text-gray-300 italic">"{l.reason}"</p>}
+                  {l.admin_comment && (
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">
+                      Admin Note: {l.admin_comment}
+                    </p>
+                  )}
                 </div>
               ))
             )}
