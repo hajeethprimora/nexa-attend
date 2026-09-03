@@ -19,14 +19,14 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 async function main() {
-  const adminEmail = 'admin@nexaattend.com';
-  const adminPassword = 'AdminPassword123!';
-  const employeeId = 'EMP001';
-  const fullName = 'System Administrator';
+  const adminEmail = 'admin@softnix.com';
+  const adminPassword = 'Softnix@01/11/25';
+  const employeeId = 'ADM001';
+  const fullName = 'Softnix Administrator';
   const role = 'admin';
   const department = 'Management';
 
-  console.log(`⏳ Creating Admin user in Supabase Auth (${adminEmail})...`);
+  console.log(`⏳ Provisioning Admin user in Supabase Auth (${adminEmail})...`);
 
   // 1. Check if user already exists
   const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
@@ -34,8 +34,18 @@ async function main() {
   const existing = (users || []).find(u => u.email === adminEmail);
 
   if (existing) {
-    console.log(`ℹ️ Admin user already exists in Auth. ID: ${existing.id}`);
+    console.log(`ℹ️ Admin user already exists in Auth. ID: ${existing.id}. Updating password...`);
     userId = existing.id;
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password: adminPassword,
+      email_confirm: true,
+      user_metadata: { employee_id: employeeId, full_name: fullName, role, department }
+    });
+    if (updateError) {
+      console.error('❌ Failed to update auth user password:', updateError.message);
+    } else {
+      console.log('✅ Admin password updated successfully!');
+    }
   } else {
     // Create User in auth.users
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -88,7 +98,7 @@ async function main() {
       vacation_used: 0
     });
 
-  console.log(`\n🎉 ADMIN CREATION COMPLETE!`);
+  console.log(`\n🎉 SOFTNIX ADMIN CREATION COMPLETE!`);
   console.log(`========================================`);
   console.log(`📧 Email:    ${adminEmail}`);
   console.log(`🔑 Password: ${adminPassword}`);
