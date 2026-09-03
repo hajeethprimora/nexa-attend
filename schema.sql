@@ -141,46 +141,57 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RLS Policies: Users
+DROP POLICY IF EXISTS "Users view own profile or admins view all" ON public.users;
 CREATE POLICY "Users view own profile or admins view all"
     ON public.users FOR SELECT
     USING (auth.uid() = id OR public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Users insert/update own profile or admins all" ON public.users;
+DROP POLICY IF EXISTS "Admins can insert or update users" ON public.users;
 CREATE POLICY "Users insert/update own profile or admins all"
     ON public.users FOR ALL
     USING (auth.uid() = id OR public.is_admin(auth.uid()));
 
 -- RLS Policies: Attendance
+DROP POLICY IF EXISTS "Users view own attendance or admins view all" ON public.attendance;
 CREATE POLICY "Users view own attendance or admins view all"
     ON public.attendance FOR SELECT
     USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Users insert/update own attendance or admins all" ON public.attendance;
 CREATE POLICY "Users insert/update own attendance or admins all"
     ON public.attendance FOR ALL
     USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
 
 -- RLS Policies: Leaves
+DROP POLICY IF EXISTS "Users view own leaves or admins view all" ON public.leaves;
 CREATE POLICY "Users view own leaves or admins view all"
     ON public.leaves FOR SELECT
     USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Users insert own leaves" ON public.leaves;
 CREATE POLICY "Users insert own leaves"
     ON public.leaves FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins update leave status" ON public.leaves;
 CREATE POLICY "Admins update leave status"
     ON public.leaves FOR UPDATE
     USING (public.is_admin(auth.uid()));
 
 -- RLS Policies: Leave Balances
+DROP POLICY IF EXISTS "Users view own leave balances or admins view all" ON public.leave_balances;
 CREATE POLICY "Users view own leave balances or admins view all"
     ON public.leave_balances FOR SELECT
     USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
 
 -- RLS Policies: Audit Logs
+DROP POLICY IF EXISTS "Admins view audit logs" ON public.audit_logs;
 CREATE POLICY "Admins view audit logs"
     ON public.audit_logs FOR SELECT
     USING (public.is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "Authenticated users insert audit logs" ON public.audit_logs;
 CREATE POLICY "Authenticated users insert audit logs"
     ON public.audit_logs FOR INSERT
     WITH CHECK (auth.uid() IS NOT NULL);
