@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Search, Filter, Edit, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { UserPlus, Search, Filter, Edit, CheckCircle, XCircle, Clock, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../../../context/AuthContext';
 import api from '../../../../lib/axiosInstance';
 import Card from '../../../../components/ui/Card';
@@ -77,6 +77,32 @@ export default function EmployeeManagementPage() {
         showToast('New employee created successfully', 'success');
         fetchEmployees();
       }
+    }
+  };
+
+  const handleToggleRole = async (targetUser: User) => {
+    const newRole = targetUser.role === 'admin' ? 'employee' : 'admin';
+    try {
+      const res = await api.put(`/admin/employees/${targetUser.id}`, {
+        employee_id: targetUser.employee_id,
+        full_name: targetUser.full_name,
+        department: targetUser.department,
+        role: newRole,
+        shift_start: targetUser.shift_start || '09:00:00',
+        shift_end: targetUser.shift_end || '17:00:00',
+        is_active: targetUser.is_active ?? true
+      });
+
+      if (res.data?.success) {
+        showToast(
+          `Role updated: ${targetUser.full_name} is now an ${newRole.toUpperCase()}`,
+          'success'
+        );
+        fetchEmployees();
+      }
+    } catch (err) {
+      console.error('Error changing user role:', err);
+      showToast('Failed to update user role', 'error');
     }
   };
 
@@ -218,7 +244,29 @@ export default function EmployeeManagementPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 text-right">
+                      <td className="py-3.5 text-right space-x-2">
+                        {/* 1-Click Make Admin / Revoke Admin Quick Action Button */}
+                        {emp.id !== user.id && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleToggleRole(emp)}
+                            title={emp.role === 'admin' ? 'Demote to Employee' : 'Promote to Admin'}
+                          >
+                            {emp.role === 'admin' ? (
+                              <>
+                                <ShieldAlert className="w-3.5 h-3.5 mr-1 text-amber-500" />
+                                <span>Demote</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-3.5 h-3.5 mr-1 text-indigo-500" />
+                                <span>Make Admin</span>
+                              </>
+                            )}
+                          </Button>
+                        )}
+
                         <Button
                           variant="outline"
                           size="sm"
