@@ -13,13 +13,13 @@ export const exportMonthlyTimesheetPDF = (
   // Header Title
   doc.setFontSize(18);
   doc.setTextColor(79, 70, 229); // Primary Indigo
-  doc.text('NexaAttend - Monthly Attendance Timesheet', 14, 20);
+  doc.text('SOFTNIX - Monthly Attendance Timesheet', 14, 20);
 
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.text(`Employee Name: ${user.full_name} (${user.employee_id})`, 14, 28);
   doc.text(`Department: ${user.department} | Period: ${month}`, 14, 34);
-  doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 14, 40);
+  doc.text(`Generated On: ${new Date().toLocaleDateString()} | Softnix Workforce Systems`, 14, 40);
 
   // Summary box
   doc.setDrawColor(226, 232, 240);
@@ -53,7 +53,7 @@ export const exportMonthlyTimesheetPDF = (
     styles: { fontSize: 9 }
   });
 
-  doc.save(`NexaAttend_Timesheet_${user.employee_id}_${month}.pdf`);
+  doc.save(`Softnix_Timesheet_${user.employee_id}_${month}.pdf`);
 };
 
 export const exportAdminSummaryPDF = (
@@ -64,12 +64,12 @@ export const exportAdminSummaryPDF = (
 
   doc.setFontSize(18);
   doc.setTextColor(79, 70, 229);
-  doc.text('NexaAttend - Corporate Monthly Attendance Report', 14, 20);
+  doc.text('SOFTNIX - Corporate Monthly Attendance Report', 14, 20);
 
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.text(`Report Period: ${month} | Total Workforce: ${reportData.length}`, 14, 28);
-  doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 14, 34);
+  doc.text(`Generated On: ${new Date().toLocaleDateString()} | Softnix Workforce Systems`, 14, 34);
 
   const tableData = reportData.map((row) => [
     row.employee_id,
@@ -90,5 +90,5 @@ export const exportAdminSummaryPDF = (
     styles: { fontSize: 9 }
   });
 
-  doc.save(`NexaAttend_Executive_Report_${month}.pdf`);
+  doc.save(`Softnix_Executive_Report_${month}.pdf`);
 };

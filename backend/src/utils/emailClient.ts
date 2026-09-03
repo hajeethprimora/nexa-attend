@@ -2,16 +2,15 @@ import nodemailer from 'nodemailer';
 import logger from './logger';
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true',
+  host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
+  port: parseInt(process.env.SMTP_PORT || '2525'),
   auth: {
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || ''
   }
 });
 
-export interface LeaveNotificationParams {
+interface LeaveNotificationOptions {
   recipientEmail: string;
   employeeName: string;
   leaveType: string;
@@ -21,29 +20,35 @@ export interface LeaveNotificationParams {
   adminComment?: string;
 }
 
-export const sendLeaveStatusNotification = async (params: LeaveNotificationParams): Promise<boolean> => {
+export const sendLeaveStatusNotification = async (options: LeaveNotificationOptions) => {
+  const { recipientEmail, employeeName, leaveType, startDate, endDate, status, adminComment } = options;
+
+  const mailOptions = {
+    from: '"Softnix Workforce Systems" <no-reply@softnix.com>',
+    to: recipientEmail,
+    subject: `Leave Request ${status.toUpperCase()} - Softnix Attend`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; rounded: 12px;">
+        <h2 style="color: ${status === 'approved' ? '#10B981' : '#EF4444'}; text-transform: uppercase;">
+          Leave Request ${status}
+        </h2>
+        <p>Dear <strong>${employeeName}</strong>,</p>
+        <p>Your request for <strong>${leaveType}</strong> leave from <strong>${startDate}</strong> to <strong>${endDate}</strong> has been <strong>${status}</strong>.</p>
+        ${adminComment ? `<p><strong>Administrator Note:</strong> ${adminComment}</p>` : ''}
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #64748B;">This is an automated notification from Softnix Attendance & Workforce Management Platform.</p>
+      </div>
+    `
+  };
+
   try {
-    if (!params.recipientEmail) return false;
-
-    const subject = `Leave Request ${params.status.toUpperCase()} - NexaAttend`;
-    const text = `Hi ${params.employeeName},\n\nYour ${params.leaveType} leave request (${params.startDate} to ${params.endDate}) has been ${params.status.toUpperCase()}.\n\nComments: ${params.adminComment || 'None'}\n\nRegards,\nHR Operations`;
-
-    if (process.env.NODE_ENV === 'test' || !process.env.SMTP_USER) {
-      logger.info(`[Email Dispatch Mock] To: ${params.recipientEmail} | Subject: ${subject}`);
-      return true;
+    if (process.env.SMTP_USER) {
+      await transporter.sendMail(mailOptions);
+      logger.info(`Email notification sent to ${recipientEmail} for leave status: ${status}`);
+    } else {
+      logger.info(`[SMTP Mock] Leave notification to ${recipientEmail}: Status = ${status}`);
     }
-
-    await transporter.sendMail({
-      from: `"NexaAttend HR" <${process.env.SMTP_FROM || 'noreply@company.com'}>`,
-      to: params.recipientEmail,
-      subject,
-      text
-    });
-
-    logger.info(`Email sent to ${params.recipientEmail}`);
-    return true;
   } catch (error) {
-    logger.error('Error sending email notification:', error);
-    return false;
+    logger.error('Error sending leave notification email:', error);
   }
 };
