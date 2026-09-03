@@ -4,14 +4,22 @@ import './globals.css';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import Navbar from '../components/ui/Navbar';
+import PWAInstallBanner from '../components/ui/PWAInstallBanner';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Softnix - Industrial Workforce & Attendance Platform',
   description: 'Enterprise grade attendance, overtime tracking, and leave management system by Softnix',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Softnix Attend',
+  },
   icons: {
     icon: '/softnix-logo.jpg',
+    apple: '/softnix-logo.jpg',
   },
 };
 
@@ -20,6 +28,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: '#4F46E5',
 };
 
 export default function RootLayout({
@@ -37,6 +46,7 @@ export default function RootLayout({
               <main className="flex-grow container mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-7xl">
                 {children}
               </main>
+              <PWAInstallBanner />
             </div>
           </AuthProvider>
         </ThemeProvider>
