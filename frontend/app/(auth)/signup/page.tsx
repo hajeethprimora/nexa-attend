@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, Lock, Mail, User, Building, CreditCard, UserPlus } from 'lucide-react';
+import { Clock, Lock, Mail, User, CreditCard, UserPlus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabaseClient';
 import api from '../../../lib/axiosInstance';
@@ -36,36 +36,37 @@ export default function SignupPage() {
     try {
       const empId = employeeId || `EMP-${Math.floor(100000 + Math.random() * 900000)}`;
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // 1. Call Backend API endpoint to register account
+      const res = await api.post('/auth/signup', {
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName,
-            employee_id: empId,
-            department,
-            role: 'employee'
-          }
-        }
+        full_name: fullName,
+        employee_id: empId,
+        department
+      });
+
+      const resData = res.data;
+      if (!resData?.success) {
+        throw new Error(resData?.message || 'Failed to register account');
+      }
+
+      // 2. Establish frontend Supabase session
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
 
       if (authError || !authData.session) {
-        const res = await api.post('/auth/signup', {
-          email,
-          password,
-          full_name: fullName,
-          employee_id: empId,
-          department
-        });
-
-        if (res.data?.success && res.data?.data?.session) {
+        if (resData.data?.session) {
           await supabase.auth.setSession({
-            access_token: res.data.data.session.access_token,
-            refresh_token: res.data.data.session.refresh_token
+            access_token: resData.data.session.access_token,
+            refresh_token: resData.data.session.refresh_token
           });
-        } else if (authError) {
-          throw new Error(authError.message);
         }
+      }
+
+      if (typeof document !== 'undefined' && authData?.session) {
+        document.cookie = `sb-access-token=${authData.session.access_token}; path=/; max-age=2592000; SameSite=Lax`;
       }
 
       await refreshUser();

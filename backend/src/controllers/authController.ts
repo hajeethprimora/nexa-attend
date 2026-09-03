@@ -58,32 +58,49 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
       return sendError(res, 'Email, password, and full name are required', 400, 'VALIDATION_ERROR');
     }
 
-    // Auto-generate employee ID if not supplied (e.g. EMP-172400)
     const empId = employee_id || `EMP-${Math.floor(100000 + Math.random() * 900000)}`;
     const userDepartment = department || 'Engineering';
     const defaultRole = 'employee';
 
-    // 1. Sign up user via Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    let userId: string;
+
+    // Try admin createUser to bypass email verification block for production usability
+    const { data: adminAuthData, error: adminAuthError } = await supabase.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          full_name,
-          employee_id: empId,
-          department: userDepartment,
-          role: defaultRole
-        }
+      email_confirm: true,
+      user_metadata: {
+        full_name,
+        employee_id: empId,
+        department: userDepartment,
+        role: defaultRole
       }
     });
 
-    if (authError || !authData.user) {
-      return sendError(res, authError?.message || 'Failed to create user account', 400, 'SIGNUP_ERROR');
+    if (!adminAuthError && adminAuthData?.user) {
+      userId = adminAuthData.user.id;
+    } else {
+      // Fallback to standard signUp
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name,
+            employee_id: empId,
+            department: userDepartment,
+            role: defaultRole
+          }
+        }
+      });
+
+      if (authError || !authData.user) {
+        return sendError(res, authError?.message || 'Failed to create user account', 400, 'SIGNUP_ERROR');
+      }
+      userId = authData.user.id;
     }
 
-    const userId = authData.user.id;
-
-    // 2. Insert into public.users
+    // Insert public.users record
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .upsert({
@@ -103,7 +120,7 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
       logger.error('Error inserting public.users profile during signup:', profileError);
     }
 
-    // 3. Initialize annual leave balance
+    // Initialize leave balance
     const currentYear = new Date().getFullYear();
     await supabase.from('leave_balances').upsert({
       user_id: userId,
@@ -124,6 +141,9 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
       details: { email, full_name, employee_id: empId, department: userDepartment }
     });
 
+    // Sign in to establish active session
+    const { data: signInData } = await supabase.auth.signInWithPassword({ email, password });
+
     return sendSuccess(res, {
       user: userProfile || {
         id: userId,
@@ -133,7 +153,7 @@ export const signup = async (req: AuthenticatedRequest, res: Response) => {
         role: defaultRole,
         department: userDepartment
       },
-      session: authData.session
+      session: signInData?.session || null
     }, 'Account created successfully', 201);
   } catch (error: any) {
     logger.error('Signup Error:', error);
