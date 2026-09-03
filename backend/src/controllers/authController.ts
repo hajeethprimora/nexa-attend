@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from '../types';
 import supabase from '../utils/supabaseClient';
 import { sendSuccess, sendError } from '../utils/response';
 import logger from '../utils/logger';
+import { logAuditEvent } from '../utils/auditLogger';
 
 export const login = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -46,6 +47,97 @@ export const login = async (req: AuthenticatedRequest, res: Response) => {
   } catch (error: any) {
     logger.error('Login Error:', error);
     return sendError(res, 'Server error during login', 500, 'SERVER_ERROR');
+  }
+};
+
+export const signup = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { email, password, full_name, employee_id, department } = req.body;
+
+    if (!email || !password || !full_name) {
+      return sendError(res, 'Email, password, and full name are required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Auto-generate employee ID if not supplied (e.g. EMP-172400)
+    const empId = employee_id || `EMP-${Math.floor(100000 + Math.random() * 900000)}`;
+    const userDepartment = department || 'Engineering';
+    const defaultRole = 'employee';
+
+    // 1. Sign up user via Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name,
+          employee_id: empId,
+          department: userDepartment,
+          role: defaultRole
+        }
+      }
+    });
+
+    if (authError || !authData.user) {
+      return sendError(res, authError?.message || 'Failed to create user account', 400, 'SIGNUP_ERROR');
+    }
+
+    const userId = authData.user.id;
+
+    // 2. Insert into public.users
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .upsert({
+        id: userId,
+        employee_id: empId,
+        full_name,
+        role: defaultRole,
+        department: userDepartment,
+        shift_start: '09:00:00',
+        shift_end: '17:00:00',
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (profileError) {
+      logger.error('Error inserting public.users profile during signup:', profileError);
+    }
+
+    // 3. Initialize annual leave balance
+    const currentYear = new Date().getFullYear();
+    await supabase.from('leave_balances').upsert({
+      user_id: userId,
+      year: currentYear,
+      sick_quota: 10,
+      casual_quota: 12,
+      vacation_quota: 15,
+      sick_used: 0,
+      casual_used: 0,
+      vacation_used: 0
+    });
+
+    await logAuditEvent({
+      actor_id: userId,
+      action: 'USER_SELF_REGISTERED',
+      target_id: userId,
+      ip_address: req.ip || null,
+      details: { email, full_name, employee_id: empId, department: userDepartment }
+    });
+
+    return sendSuccess(res, {
+      user: userProfile || {
+        id: userId,
+        email,
+        employee_id: empId,
+        full_name,
+        role: defaultRole,
+        department: userDepartment
+      },
+      session: authData.session
+    }, 'Account created successfully', 201);
+  } catch (error: any) {
+    logger.error('Signup Error:', error);
+    return sendError(res, 'Server error during account registration', 500, 'SERVER_ERROR');
   }
 };
 

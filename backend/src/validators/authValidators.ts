@@ -15,3 +15,12 @@ export const validateLogin = [
   body('password').notEmpty().withMessage('Password is required'),
   handleValidationErrors
 ];
+
+export const validateSignup = [
+  body('email').isEmail().withMessage('Valid email address is required').normalizeEmail(),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('full_name').notEmpty().withMessage('Full name is required').trim(),
+  body('employee_id').optional().isString().trim(),
+  body('department').optional().isString().trim(),
+  handleValidationErrors
+];

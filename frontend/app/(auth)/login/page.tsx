@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { Clock, Lock, Mail } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
@@ -91,9 +92,12 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="pt-4 border-t border-gray-100 dark:border-gray-800 text-center">
-          <p className="text-[11px] text-gray-400 font-medium">
-            Protected by NexaAttend Industrial Security & Row-Level Access Policy
+        <div className="pt-4 border-t border-gray-100 dark:border-gray-800 text-center space-y-2">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            Don't have an account?{' '}
+            <Link href="/signup" className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+              Create an Account
+            </Link>
           </p>
         </div>
       </div>

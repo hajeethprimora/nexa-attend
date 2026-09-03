@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { supabase } from './supabaseClient';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+let rawUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').trim().replace(/\/+$/, '');
+if (!rawUrl.endsWith('/api')) {
+  rawUrl += '/api';
+}
+const API_BASE_URL = rawUrl;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
