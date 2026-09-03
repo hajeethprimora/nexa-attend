@@ -38,20 +38,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// 3. Auto-route URL rewriter: handles requests even if client calls without /api prefix
-app.use((req: Request, res: Response, next: NextFunction) => {
-  if (!req.path.startsWith('/api') && (
-    req.path.startsWith('/auth') ||
-    req.path.startsWith('/attendance') ||
-    req.path.startsWith('/leaves') ||
-    req.path.startsWith('/admin')
-  )) {
-    req.url = `/api${req.url}`;
-  }
-  next();
-});
-
-// 4. Request Rate Limiting
+// 3. Request Rate Limiting
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -64,17 +51,17 @@ const apiLimiter = rateLimit({
   message: { success: false, message: 'Rate limit exceeded. Please slow down your requests.' }
 });
 
-app.use('/api/auth/login', authLimiter);
-app.use('/api', apiLimiter);
+app.use(['/api/auth/login', '/auth/login'], authLimiter);
+app.use(['/api', '/'], apiLimiter);
 
-// 5. Body Parsers
+// 4. Body Parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 6. Request Tracking Logger
+// 5. Request Tracking Logger
 app.use(requestLogger);
 
-// 7. Production Health Check Endpoint
+// 6. Production Health Check Endpoint
 app.get(['/api/health', '/health'], (req: Request, res: Response) => {
   return sendSuccess(res, {
     status: 'healthy',
@@ -83,16 +70,16 @@ app.get(['/api/health', '/health'], (req: Request, res: Response) => {
   }, 'Softnix Enterprise Backend API is healthy');
 });
 
-// 8. API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/attendance', attendanceRoutes);
-app.use('/api/leaves', leaveRoutes);
-app.use('/api/admin', adminRoutes);
+// 7. Mount Dual API & Direct Routes (Works with or without /api prefix)
+app.use(['/api/auth', '/auth'], authRoutes);
+app.use(['/api/attendance', '/attendance'], attendanceRoutes);
+app.use(['/api/leaves', '/leaves'], leaveRoutes);
+app.use(['/api/admin', '/admin'], adminRoutes);
 
-// 9. Global Error Handler
+// 8. Global Error Handler
 app.use(errorHandler);
 
-// 10. Start Express Server
+// 9. Start Express Server
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     logger.info(`✅ Softnix Industrial-Tier Enterprise Backend running on port ${PORT}`);
