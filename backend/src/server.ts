@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
@@ -19,7 +20,14 @@ const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
 
-// 1. Universal Fail-Safe CORS Middleware (Handles Preflight & All Origins)
+// 1. Enable Permissive Package CORS & Custom Wildcard Header Middleware (Fixes all CORS preflights)
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'Accept']
+}));
+
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
   res.setHeader('Access-Control-Allow-Origin', origin || '*');
@@ -41,18 +49,18 @@ app.use(helmet({
 // 3. Request Rate Limiting
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 200,
   message: { success: false, message: 'Too many authentication attempts. Please try again after 15 minutes.' }
 });
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 2000,
+  max: 5000,
   message: { success: false, message: 'Rate limit exceeded. Please slow down your requests.' }
 });
 
-app.use(['/api/auth/login', '/auth/login'], authLimiter);
-app.use(['/api', '/'], apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api', apiLimiter);
 
 // 4. Body Parsers
 app.use(express.json({ limit: '10mb' }));

@@ -1,20 +1,28 @@
 import axios from 'axios';
 import { supabase } from './supabaseClient';
 
-let rawUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').trim().replace(/\/+$/, '');
-if (!rawUrl.endsWith('/api')) {
-  rawUrl += '/api';
-}
-const API_BASE_URL = rawUrl;
+const rawUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://nexa-attend.onrender.com')
+  .trim()
+  .replace(/\/+$/, '')
+  .replace(/\/api$/, '');
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: rawUrl,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 api.interceptors.request.use(async (config) => {
+  // Normalize request path so it always has the /api prefix
+  if (config.url && !config.url.startsWith('http')) {
+    let cleanPath = config.url.startsWith('/') ? config.url : `/${config.url}`;
+    if (!cleanPath.startsWith('/api')) {
+      cleanPath = `/api${cleanPath}`;
+    }
+    config.url = cleanPath;
+  }
+
   if (typeof window !== 'undefined') {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) {
