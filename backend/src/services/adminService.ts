@@ -100,11 +100,13 @@ export class AdminService {
   }
 
   static async updateLeaveStatus(leaveId: string, status: 'approved' | 'rejected', adminComment: string, adminId: string, clientIp: string | null) {
-    const { data: leave, error: leaveError } = await supabase
+    const { data: leaves, error: leaveError } = await supabase
       .from('leaves')
       .select('*, users!user_id(full_name, employee_id)')
       .eq('id', leaveId)
-      .single();
+      .limit(1);
+
+    const leave = leaves?.[0] || null;
 
     if (leaveError || !leave) {
       throw new AppError('Leave request not found', 404, 'NOT_FOUND');
@@ -127,12 +129,14 @@ export class AdminService {
       const days = calculateDays(leave.start_date, leave.end_date);
       const currentYear = new Date(leave.start_date).getFullYear();
 
-      const { data: balance } = await supabase
+      const { data: balances } = await supabase
         .from('leave_balances')
         .select('*')
         .eq('user_id', leave.user_id)
         .eq('year', currentYear)
-        .maybeSingle();
+        .limit(1);
+
+      const balance = balances?.[0] || null;
 
       if (balance) {
         const usedField = `${leave.type}_used`;

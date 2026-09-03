@@ -22,6 +22,17 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
+  // Ensure CORS headers are present on all error responses
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-ID');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+
   logger.error(`Error processing request ${req.method} ${req.originalUrl}:`, err);
 
   if (err instanceof AppError) {

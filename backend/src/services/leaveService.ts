@@ -13,18 +13,19 @@ export const calculateDays = (start: string, end: string): number => {
 
 export class LeaveService {
   static async getOrCreateLeaveBalance(userId: string, year: number = new Date().getFullYear()): Promise<LeaveBalance> {
-    const { data: balance, error } = await supabase
+    const { data: balances, error } = await supabase
       .from('leave_balances')
       .select('*')
       .eq('user_id', userId)
       .eq('year', year)
-      .maybeSingle();
+      .limit(1);
 
     if (error) {
       logger.error('Error fetching leave balance:', error);
       throw new AppError('Failed to retrieve leave balance', 500, 'DB_ERROR');
     }
 
+    const balance = balances?.[0] || null;
     if (balance) return balance;
 
     const { data: newBalance, error: createError } = await supabase

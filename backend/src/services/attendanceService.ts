@@ -45,27 +45,29 @@ export class AttendanceService {
   static async getTodayStatus(userId: string) {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    let { data: record, error } = await supabase
+    const { data: openRecords, error } = await supabase
       .from('attendance')
       .select('*')
       .eq('user_id', userId)
       .is('clock_out', null)
       .order('clock_in', { ascending: false })
-      .maybeSingle();
+      .limit(1);
 
     if (error) throw new AppError(error.message, 500, 'DB_ERROR');
 
+    let record = openRecords?.[0] || null;
+
     if (!record) {
-      const { data: todayRecord, error: todayError } = await supabase
+      const { data: todayRecords, error: todayError } = await supabase
         .from('attendance')
         .select('*')
         .eq('user_id', userId)
         .eq('date', todayStr)
         .order('clock_in', { ascending: false })
-        .maybeSingle();
+        .limit(1);
 
       if (todayError) throw new AppError(todayError.message, 500, 'DB_ERROR');
-      record = todayRecord;
+      record = todayRecords?.[0] || null;
     }
 
     const status = getRecordStatus(record);
@@ -75,16 +77,16 @@ export class AttendanceService {
   static async clockIn(user: UserProfile, payload: { lat?: number; lng?: number; notes?: string }, clientIp: string | null) {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const { data: activeSession, error: checkError } = await supabase
+    const { data: activeSessions, error: checkError } = await supabase
       .from('attendance')
       .select('*')
       .eq('user_id', user.id)
       .is('clock_out', null)
-      .maybeSingle();
+      .limit(1);
 
     if (checkError) throw new AppError(checkError.message, 500, 'DB_ERROR');
 
-    if (activeSession) {
+    if (activeSessions && activeSessions.length > 0) {
       throw new AppError('You already have an active clock-in session. Please clock out first.', 400, 'SESSION_ALREADY_ACTIVE');
     }
 
@@ -132,12 +134,14 @@ export class AttendanceService {
   }
 
   static async breakStart(userId: string) {
-    const { data: record, error: findError } = await supabase
+    const { data: records, error: findError } = await supabase
       .from('attendance')
       .select('*')
       .eq('user_id', userId)
       .is('clock_out', null)
-      .maybeSingle();
+      .limit(1);
+
+    const record = records?.[0] || null;
 
     if (findError || !record) {
       throw new AppError('No active clock-in session found to start a break', 400, 'NO_ACTIVE_SESSION');
@@ -168,12 +172,14 @@ export class AttendanceService {
   }
 
   static async breakEnd(userId: string) {
-    const { data: record, error: findError } = await supabase
+    const { data: records, error: findError } = await supabase
       .from('attendance')
       .select('*')
       .eq('user_id', userId)
       .is('clock_out', null)
-      .maybeSingle();
+      .limit(1);
+
+    const record = records?.[0] || null;
 
     if (findError || !record) {
       throw new AppError('No active clock-in session found to end break', 400, 'NO_ACTIVE_SESSION');
@@ -207,12 +213,14 @@ export class AttendanceService {
   }
 
   static async clockOut(userId: string, clientIp: string | null) {
-    const { data: record, error: findError } = await supabase
+    const { data: records, error: findError } = await supabase
       .from('attendance')
       .select('*')
       .eq('user_id', userId)
       .is('clock_out', null)
-      .maybeSingle();
+      .limit(1);
+
+    const record = records?.[0] || null;
 
     if (findError || !record) {
       throw new AppError('No active clock-in session found to clock out', 404, 'NO_ACTIVE_SESSION');
