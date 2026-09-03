@@ -1,5 +1,4 @@
 import express, { Request, Response, NextFunction } from 'express';
-import cors, { CorsOptions } from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
@@ -20,24 +19,24 @@ const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
 
-// 1. Security Headers Middleware
+// 1. Universal Fail-Safe CORS Middleware (Handles Preflight & All Origins)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-ID, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
+// 2. Security Headers Middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
-
-// 2. CORS Configuration - Permissive for Cloud Deployments (Netlify, Vercel, Render)
-const corsOptions: CorsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow all origins in production to prevent CORS blocks on Netlify/Vercel/Render
-    return callback(null, true);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 // 3. Auto-route URL rewriter: handles requests even if client calls without /api prefix
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -55,13 +54,13 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // 4. Request Rate Limiting
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50,
+  max: 100,
   message: { success: false, message: 'Too many authentication attempts. Please try again after 15 minutes.' }
 });
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 2000,
   message: { success: false, message: 'Rate limit exceeded. Please slow down your requests.' }
 });
 
