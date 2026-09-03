@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors, { CorsOptions } from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -25,19 +25,11 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// 2. CORS Configuration
-const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:3000',
-  'http://127.0.0.1:3000'
-];
-
+// 2. CORS Configuration - Permissive for Cloud Deployments (Netlify, Vercel, Render)
 const corsOptions: CorsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin as string)) {
-      callback(null, true);
-    } else {
-      callback(null, false);
-    }
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow all origins in production to prevent CORS blocks on Netlify/Vercel/Render
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -45,52 +37,66 @@ const corsOptions: CorsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
-// 3. Request Rate Limiting
+// 3. Auto-route URL rewriter: handles requests even if client calls without /api prefix
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (!req.path.startsWith('/api') && (
+    req.path.startsWith('/auth') ||
+    req.path.startsWith('/attendance') ||
+    req.path.startsWith('/leaves') ||
+    req.path.startsWith('/admin')
+  )) {
+    req.url = `/api${req.url}`;
+  }
+  next();
+});
+
+// 4. Request Rate Limiting
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 50,
   message: { success: false, message: 'Too many authentication attempts. Please try again after 15 minutes.' }
 });
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 1000,
   message: { success: false, message: 'Rate limit exceeded. Please slow down your requests.' }
 });
 
 app.use('/api/auth/login', authLimiter);
 app.use('/api', apiLimiter);
 
-// 4. Body Parsers
+// 5. Body Parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 5. Request Tracking Logger
+// 6. Request Tracking Logger
 app.use(requestLogger);
 
-// 6. Production Health Check Endpoint
-app.get('/api/health', (req: Request, res: Response) => {
+// 7. Production Health Check Endpoint
+app.get(['/api/health', '/health'], (req: Request, res: Response) => {
   return sendSuccess(res, {
     status: 'healthy',
     uptime: process.uptime(),
     version: '2.0.0-enterprise'
-  }, 'NexaAttend Enterprise Backend API is healthy');
+  }, 'Softnix Enterprise Backend API is healthy');
 });
 
-// 7. API Routes
+// 8. API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/admin', adminRoutes);
 
-// 8. Global Error Handler
+// 9. Global Error Handler
 app.use(errorHandler);
 
-// 9. Start Express Server
+// 10. Start Express Server
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    logger.info(`✅ NexaAttend Industrial-Tier Enterprise Backend running on port ${PORT}`);
+    logger.info(`✅ Softnix Industrial-Tier Enterprise Backend running on port ${PORT}`);
   });
 }
 
