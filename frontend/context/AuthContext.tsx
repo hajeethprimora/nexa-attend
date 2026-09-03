@@ -10,6 +10,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User | null>;
+  signup: (payload: { email: string; password: string; full_name: string; employee_id?: string; department?: string }) => Promise<User | null>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   login: async () => null,
+  signup: async () => null,
   logout: async () => {},
   refreshUser: async () => {},
 });
@@ -132,6 +134,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return profile;
   };
 
+  const signup = async (payload: {
+    email: string;
+    password: string;
+    full_name: string;
+    employee_id?: string;
+    department?: string;
+  }): Promise<User | null> => {
+    const response = await api.post('/auth/signup', payload);
+    const resData = response.data;
+
+    if (!resData?.success) {
+      throw new Error(resData?.message || 'Registration failed');
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: payload.email,
+      password: payload.password
+    });
+
+    if (authError || !authData.session) {
+      if (resData.data?.session) {
+        await supabase.auth.setSession({
+          access_token: resData.data.session.access_token,
+          refresh_token: resData.data.session.refresh_token
+        });
+      }
+    }
+
+    if (typeof document !== 'undefined' && authData?.session) {
+      document.cookie = `sb-access-token=${authData.session.access_token}; path=/; max-age=2592000; SameSite=Lax`;
+    }
+
+    const profile = await fetchProfile(authData?.user || resData.data?.user);
+    return profile;
+  };
+
   const logout = async () => {
     try {
       await supabase.auth.signOut();
@@ -154,7 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

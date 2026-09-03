@@ -3,15 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, Lock, Mail, User, CreditCard, UserPlus } from 'lucide-react';
+import { Lock, Mail, User, CreditCard, UserPlus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { supabase } from '../../../lib/supabaseClient';
-import api from '../../../lib/axiosInstance';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
 
 export default function SignupPage() {
-  const { user, refreshUser } = useAuth();
+  const { user, signup } = useAuth();
   const router = useRouter();
 
   const [fullName, setFullName] = useState('');
@@ -36,8 +34,7 @@ export default function SignupPage() {
     try {
       const empId = employeeId || `EMP-${Math.floor(100000 + Math.random() * 900000)}`;
 
-      // 1. Call Backend API endpoint to register account
-      const res = await api.post('/auth/signup', {
+      await signup({
         email,
         password,
         full_name: fullName,
@@ -45,31 +42,6 @@ export default function SignupPage() {
         department
       });
 
-      const resData = res.data;
-      if (!resData?.success) {
-        throw new Error(resData?.message || 'Failed to register account');
-      }
-
-      // 2. Establish frontend Supabase session
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (authError || !authData.session) {
-        if (resData.data?.session) {
-          await supabase.auth.setSession({
-            access_token: resData.data.session.access_token,
-            refresh_token: resData.data.session.refresh_token
-          });
-        }
-      }
-
-      if (typeof document !== 'undefined' && authData?.session) {
-        document.cookie = `sb-access-token=${authData.session.access_token}; path=/; max-age=2592000; SameSite=Lax`;
-      }
-
-      await refreshUser();
       router.push('/dashboard');
     } catch (err: any) {
       console.error('Signup submit error:', err);
