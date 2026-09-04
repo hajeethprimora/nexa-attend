@@ -30,32 +30,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
 
   const fetchProfile = async (sessionUser: any): Promise<User | null> => {
+    if (!sessionUser) {
+      setUser(null);
+      return null;
+    }
+
+    // Set immediate profile from session metadata first to avoid blocking UI render
+    const defaultProfile: User = {
+      id: sessionUser.id,
+      email: sessionUser.email || '',
+      employee_id: sessionUser.user_metadata?.employee_id || 'EMP001',
+      full_name: sessionUser.user_metadata?.full_name || sessionUser.email,
+      role: sessionUser.user_metadata?.role || 'employee',
+      department: sessionUser.user_metadata?.department || 'Engineering'
+    };
+    setUser(defaultProfile);
+
+    // Asynchronously fetch fresh profile from backend with 4-second timeout
     try {
-      const res = await api.get('/auth/me');
+      const res = await api.get('/auth/me', { timeout: 4000 });
       const userData = res.data?.data?.user || res.data?.user;
       if (res.data?.success && userData) {
         setUser(userData);
         return userData;
       }
     } catch (err) {
-      console.warn('Backend /auth/me failed, falling back to local metadata:', err);
+      console.warn('Backend /auth/me call skipped or timed out, using local session metadata');
     }
 
-    if (sessionUser) {
-      const profile: User = {
-        id: sessionUser.id,
-        email: sessionUser.email || '',
-        employee_id: sessionUser.user_metadata?.employee_id || 'EMP001',
-        full_name: sessionUser.user_metadata?.full_name || sessionUser.email,
-        role: sessionUser.user_metadata?.role || 'employee',
-        department: sessionUser.user_metadata?.department || 'Engineering'
-      };
-      setUser(profile);
-      return profile;
-    } else {
-      setUser(null);
-      return null;
-    }
+    return defaultProfile;
   };
 
   useEffect(() => {
@@ -96,8 +99,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
 
+    // Safety fallback timer: guarantee loading state unblocks after max 1.5 seconds
+    const safetyTimer = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 1500);
+
     return () => {
       mounted = false;
+      clearTimeout(safetyTimer);
       listener?.subscription?.unsubscribe();
     };
   }, []);
