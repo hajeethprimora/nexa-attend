@@ -65,22 +65,28 @@ export default function EmployeeManagementPage() {
   }, [user, authLoading, router, fetchEmployees]);
 
   const handleSaveEmployee = async (formData: any, employeeId?: string) => {
-    if (employeeId) {
-      const res = await api.put(`/admin/employees/${employeeId}`, formData);
-      if (res.data?.success) {
-        showToast('Employee updated successfully', 'success');
-        fetchEmployees();
-      }
-    } else {
-      const res = await api.post('/admin/employees', formData);
-      if (res.data?.success) {
-        showToast(`Employee profile created under ${formData.department}`, 'success');
-        if (selectedDepartment && selectedDepartment !== formData.department) {
-          setSelectedDepartment(formData.department);
-        } else {
+    try {
+      if (employeeId) {
+        const res = await api.put(`/admin/employees/${employeeId}`, formData);
+        if (res.data?.success) {
+          showToast('Employee updated successfully', 'success');
           fetchEmployees();
         }
+      } else {
+        const res = await api.post('/admin/employees', formData);
+        if (res.data?.success) {
+          showToast(`Employee profile created under ${formData.department}`, 'success');
+          if (selectedDepartment && selectedDepartment !== formData.department) {
+            setSelectedDepartment(formData.department);
+          } else {
+            fetchEmployees();
+          }
+        }
       }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Failed to save employee profile';
+      showToast(msg, 'error');
+      throw err;
     }
   };
 

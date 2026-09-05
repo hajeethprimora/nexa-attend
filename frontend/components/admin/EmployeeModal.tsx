@@ -31,8 +31,10 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
   const [shiftEnd, setShiftEnd] = useState('17:00');
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   useEffect(() => {
+    setModalError('');
     if (employee) {
       setEmployeeId(employee.employee_id || '');
       setFullName(employee.full_name || '');
@@ -44,7 +46,9 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
       setShiftEnd(employee.shift_end?.slice(0, 5) || '17:00');
       setIsActive(employee.is_active ?? true);
     } else {
-      setEmployeeId('');
+      // Auto-generate a unique default Employee ID (e.g. EMP4821) for new profiles
+      const autoId = `EMP${Math.floor(1000 + Math.random() * 9000)}`;
+      setEmployeeId(autoId);
       setFullName('');
       setEmail('');
       setPassword('');
@@ -58,6 +62,7 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setModalError('');
     setIsSubmitting(true);
     try {
       await onSave({
@@ -72,8 +77,10 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
         is_active: isActive
       }, employee?.id);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving employee profile:', err);
+      const errMsg = err.response?.data?.message || err.message || 'Failed to save employee profile';
+      setModalError(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -87,12 +94,21 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {modalError && (
+          <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-xs font-semibold text-rose-600 dark:text-rose-400 animate-in fade-in duration-150">
+            ⚠️ {modalError}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Employee ID"
             value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-            placeholder="e.g. EMP001"
+            onChange={(e) => {
+              setEmployeeId(e.target.value);
+              if (modalError) setModalError('');
+            }}
+            placeholder="e.g. EMP002"
             required
           />
           <Input
@@ -110,8 +126,11 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
               label="Email Address"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="john@softnix.com"
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (modalError) setModalError('');
+              }}
+              placeholder="employee@softnix.com"
               required
             />
             <Input
