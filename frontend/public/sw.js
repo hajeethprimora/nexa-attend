@@ -36,7 +36,50 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Service Worker Fetch Event - Cache First for Assets, Network First for APIs
+// 3. Web Push Event - Display Native OS Notifications
+self.addEventListener('push', (event) => {
+  let payload = { title: 'Softnix Attend Alert', body: 'New attendance update', url: '/dashboard' };
+
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (e) {
+      payload.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: payload.body,
+    icon: '/softnix-logo.jpg',
+    badge: '/softnix-logo.jpg',
+    data: { url: payload.url || '/dashboard' }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, options)
+  );
+});
+
+// 4. Notification Click Event - Open PWA App Window
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/dashboard';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(targetUrl) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+// 5. Service Worker Fetch Event - Cache First for Assets, Network First for APIs
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);

@@ -3,6 +3,7 @@ import logger from '../utils/logger';
 import { logAuditEvent } from '../utils/auditLogger';
 import { LeaveType, LeaveBalance } from '../types';
 import { AppError } from '../middleware/errorHandler';
+import { sendLeaveRequestNotification } from '../utils/emailService';
 
 export const calculateDays = (start: string, end: string): number => {
   const startDate = new Date(start);
@@ -104,6 +105,20 @@ export class LeaveService {
       .single();
 
     if (error) throw new AppError(error.message, 500, 'DB_ERROR');
+
+    // Fetch user details for notification
+    const { data: userRows } = await supabase.from('users').select('full_name, email').eq('id', userId).limit(1);
+    const user = userRows?.[0];
+
+    // Trigger automated email alert to admin
+    sendLeaveRequestNotification({
+      adminEmail: process.env.ADMIN_EMAIL || 'admin@softnix.com',
+      employeeName: user?.full_name || 'Employee',
+      leaveType: type,
+      startDate: start_date,
+      endDate: end_date,
+      reason
+    }).catch(err => logger.error('Error dispatching leave request email:', err));
 
     await logAuditEvent({
       actor_id: userId,

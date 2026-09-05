@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, LogOut, User, Menu, X, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, LogOut, User, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
+import NotificationBell from './NotificationBell';
 import Badge from './Badge';
 
 export const Navbar: React.FC = () => {
@@ -101,6 +102,7 @@ export const Navbar: React.FC = () => {
           {/* Desktop User Controls */}
           <div className="hidden md:flex items-center space-x-3">
             <ThemeToggle />
+            {user && <NotificationBell />}
 
             {user ? (
               <div className="flex items-center space-x-3 pl-3 border-l border-gray-100 dark:border-gray-800">
@@ -134,6 +136,7 @@ export const Navbar: React.FC = () => {
           {/* Mobile Right Bar Items & Hamburger Button */}
           <div className="flex md:hidden items-center space-x-2">
             <ThemeToggle />
+            {user && <NotificationBell />}
 
             {user && (
               <button
