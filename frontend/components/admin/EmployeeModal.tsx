@@ -10,6 +10,7 @@ interface EmployeeModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: User | null;
+  defaultDepartment?: string;
   onSave: (formData: any, id?: string) => Promise<void>;
 }
 
@@ -17,13 +18,14 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
   isOpen,
   onClose,
   employee,
+  defaultDepartment = 'Engineering',
   onSave
 }) => {
   const [employeeId, setEmployeeId] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [department, setDepartment] = useState('Engineering');
+  const [department, setDepartment] = useState(defaultDepartment);
   const [role, setRole] = useState<'admin' | 'employee'>('employee');
   const [shiftStart, setShiftStart] = useState('09:00');
   const [shiftEnd, setShiftEnd] = useState('17:00');
@@ -36,7 +38,7 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
       setFullName(employee.full_name || '');
       setEmail(employee.email || '');
       setPassword('');
-      setDepartment(employee.department || 'Engineering');
+      setDepartment(employee.department || defaultDepartment || 'Engineering');
       setRole(employee.role || 'employee');
       setShiftStart(employee.shift_start?.slice(0, 5) || '09:00');
       setShiftEnd(employee.shift_end?.slice(0, 5) || '17:00');
@@ -46,13 +48,13 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
       setFullName('');
       setEmail('');
       setPassword('');
-      setDepartment('Engineering');
+      setDepartment(defaultDepartment || 'Engineering');
       setRole('employee');
       setShiftStart('09:00');
       setShiftEnd('17:00');
       setIsActive(true);
     }
-  }, [employee, isOpen]);
+  }, [employee, isOpen, defaultDepartment]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

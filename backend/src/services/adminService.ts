@@ -290,24 +290,41 @@ export class AdminService {
       throw new AppError(`Employee ID ${employee_id} is already in use.`, 400, 'DUPLICATE_EMPLOYEE_ID');
     }
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    let newUserId: string;
+
+    const { data: adminAuthData, error: adminAuthError } = await supabase.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          full_name,
-          employee_id,
-          role: role || 'employee',
-          department: department || 'Engineering'
-        }
+      email_confirm: true,
+      user_metadata: {
+        full_name,
+        employee_id,
+        role: role || 'employee',
+        department: department || 'Engineering'
       }
     });
 
-    if (authError || !authData.user) {
-      throw new AppError(authError?.message || 'Failed to create auth account', 400, 'AUTH_ERROR');
-    }
+    if (!adminAuthError && adminAuthData?.user) {
+      newUserId = adminAuthData.user.id;
+    } else {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name,
+            employee_id,
+            role: role || 'employee',
+            department: department || 'Engineering'
+          }
+        }
+      });
 
-    const newUserId = authData.user.id;
+      if (authError || !authData.user) {
+        throw new AppError(authError?.message || 'Failed to create auth account', 400, 'AUTH_ERROR');
+      }
+      newUserId = authData.user.id;
+    }
 
     const { data: userProfile, error: profileError } = await supabase
       .from('users')

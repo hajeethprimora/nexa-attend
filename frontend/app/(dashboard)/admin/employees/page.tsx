@@ -74,8 +74,12 @@ export default function EmployeeManagementPage() {
     } else {
       const res = await api.post('/admin/employees', formData);
       if (res.data?.success) {
-        showToast('New employee created successfully', 'success');
-        fetchEmployees();
+        showToast(`Employee profile created under ${formData.department}`, 'success');
+        if (selectedDepartment && selectedDepartment !== formData.department) {
+          setSelectedDepartment(formData.department);
+        } else {
+          fetchEmployees();
+        }
       }
     }
   };
@@ -370,6 +374,7 @@ export default function EmployeeManagementPage() {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         employee={selectedEmployee}
+        defaultDepartment={selectedDepartment || 'Design'}
         onSave={handleSaveEmployee}
       />
 
