@@ -16,6 +16,18 @@ import { AttendanceService } from './services/attendanceService';
 
 const app = express();
 
+// Vercel / AWS Lambda run the exported app as a function: no listen(), timers or process.exit()
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+/** Names (never values) of required settings that are missing. */
+const missingConfig = (): string[] => {
+  const missing: string[] = [];
+  if (!config.supabaseUrl) missing.push('SUPABASE_URL');
+  if (!config.supabaseServiceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (config.isProduction && config.frontendUrls.length === 0) missing.push('FRONTEND_URL');
+  return missing;
+};
+
 // Render / Railway / Fly put one proxy in front of the app; needed for correct req.ip
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
@@ -76,11 +88,14 @@ app.use(requestLogger);
 
 // 6. Health check
 app.get(['/api/health', '/health'], (req: Request, res: Response) => {
+  const missing = missingConfig();
   return sendSuccess(res, {
-    status: 'healthy',
+    status: missing.length ? 'misconfigured' : 'healthy',
+    missing_env: missing,
+    timezone: config.timeZone,
     uptime: process.uptime(),
     version: '2.1.0'
-  }, 'Backend API is healthy');
+  }, missing.length ? `Missing environment variables: ${missing.join(', ')}` : 'Backend API is healthy');
 });
 
 // 7. Routes
@@ -102,7 +117,8 @@ const validateConfig = () => {
   if (config.timeZoneInvalid) problems.push(`APP_TIMEZONE "${process.env.APP_TIMEZONE}" is not a valid IANA zone; falling back to UTC`);
   if (!process.env.APP_TIMEZONE) problems.push('APP_TIMEZONE not set: using UTC for "today", late arrival and reports');
   problems.forEach(p => logger.warn(`Config: ${p}`));
-  if (config.isProduction && (!config.supabaseUrl || !config.supabaseServiceRoleKey)) {
+  // On a long-running server, fail fast. On serverless, keep serving so /api/health can explain the problem.
+  if (config.isProduction && !isServerless && (!config.supabaseUrl || !config.supabaseServiceRoleKey)) {
     logger.error('Refusing to start without Supabase credentials');
     process.exit(1);
   }
@@ -111,7 +127,9 @@ const validateConfig = () => {
 // 9. Start
 if (!config.isTest) {
   validateConfig();
+}
 
+if (!config.isTest && !isServerless) {
   const server = app.listen(config.port, () => {
     logger.info(`Backend running on port ${config.port} (tz=${config.timeZone}, origins=${config.frontendUrls.join(', ') || 'any (dev)'})`);
   });
