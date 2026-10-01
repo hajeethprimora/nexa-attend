@@ -43,14 +43,14 @@ export const LeaveApprovalPanel: React.FC<LeaveApprovalPanelProps> = ({
   return (
     <Card
       header={
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="hidden sm:flex w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900">
               <Inbox className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Pending Leave Approvals Inbox</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Review employee leave applications and update quotas</p>
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">Pending Leave Approvals</h3>
+              <p className="hidden sm:block text-xs text-gray-500 dark:text-gray-400">Review employee leave applications and update quotas</p>
             </div>
           </div>
           <Badge variant="warning">{pendingLeaves.length} Pending</Badge>
@@ -64,7 +64,7 @@ export const LeaveApprovalPanel: React.FC<LeaveApprovalPanelProps> = ({
           pendingLeaves.map((l) => (
             <div
               key={l.id}
-              className="p-5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+              className="p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
             >
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -89,13 +89,14 @@ export const LeaveApprovalPanel: React.FC<LeaveApprovalPanelProps> = ({
                   placeholder="Optional admin note..."
                   value={comments[l.id] || ''}
                   onChange={(e) => setComments({ ...comments, [l.id]: e.target.value })}
-                  className="px-3 py-1.5 rounded-xl text-xs border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="px-3 py-2.5 sm:py-1.5 rounded-xl text-xs border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
 
-                <div className="flex items-center space-x-2">
+                <div className="grid grid-cols-2 sm:flex items-center gap-2">
                   <Button
                     variant="success"
                     size="sm"
+                    className="py-2.5 sm:py-1.5"
                     onClick={() => handleAction(l.id, 'approved')}
                     isLoading={processingId === l.id}
                   >
@@ -105,6 +106,7 @@ export const LeaveApprovalPanel: React.FC<LeaveApprovalPanelProps> = ({
                   <Button
                     variant="danger"
                     size="sm"
+                    className="py-2.5 sm:py-1.5"
                     onClick={() => handleAction(l.id, 'rejected')}
                     isLoading={processingId === l.id}
                   >

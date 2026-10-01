@@ -106,7 +106,7 @@ export const AdminDepartmentChart: React.FC<AdminAnalyticsProps> = ({ reportData
         <p className="text-xs text-gray-500 dark:text-gray-400">Total accumulated hours per department</p>
       </div>
     }>
-      <div className="h-64 w-full flex items-center justify-center">
+      <div className="h-72 w-full flex items-center justify-center">
         {pieData.length === 0 ? (
           <p className="text-sm text-gray-400">No department data available</p>
         ) : (
@@ -116,12 +116,10 @@ export const AdminDepartmentChart: React.FC<AdminAnalyticsProps> = ({ reportData
                 data={pieData}
                 cx="50%"
                 cy="50%"
-                innerRadius={55}
-                outerRadius={85}
+                innerRadius="55%"
+                outerRadius="80%"
                 paddingAngle={4}
                 dataKey="value"
-                label={({ name, percent }: { name?: string; percent?: number }) => `${name || ''} (${((percent || 0) * 100).toFixed(0)}%)`}
-                labelLine={false}
               >
                 {pieData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -137,6 +135,7 @@ export const AdminDepartmentChart: React.FC<AdminAnalyticsProps> = ({ reportData
                   fontSize: '12px'
                 }}
               />
+              <Legend wrapperStyle={{ fontSize: '12px' }} iconType="circle" />
             </PieChart>
           </ResponsiveContainer>
         )}

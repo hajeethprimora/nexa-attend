@@ -161,13 +161,13 @@ export default function DashboardPage() {
   const pendingLeavesCount = userLeaves.filter(l => l.status === 'pending').length;
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+    <div className="space-y-4 sm:space-y-8 animate-fade-in">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
-            Welcome back, {user.full_name} 👋
+          <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
+            Hi, {user.full_name.split(' ')[0]} 👋
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
             {user.employee_id} • {user.department} • Shift {user.shift_start?.slice(0, 5) || '09:00'} - {user.shift_end?.slice(0, 5) || '17:00'}
           </p>
         </div>
@@ -177,15 +177,6 @@ export default function DashboardPage() {
           <span>Apply for Leave</span>
         </Button>
       </div>
-
-      <StatusCard
-        todayHours={todayHours}
-        weekHours={historySummary?.total_hours || 0}
-        officeDays={historySummary?.office_days || 0}
-        remoteDays={historySummary?.remote_days || 0}
-        pendingLeavesCount={pendingLeavesCount}
-        leaveBalance={leaveBalance}
-      />
 
       <ClockButtons
         todayRecord={todayRecord}
@@ -199,6 +190,15 @@ export default function DashboardPage() {
         onBreakEnd={handleBreakEnd}
         onClockOut={handleClockOut}
         isLoading={isLoadingAction}
+      />
+
+      <StatusCard
+        todayHours={todayHours}
+        weekHours={historySummary?.total_hours || 0}
+        officeDays={historySummary?.office_days || 0}
+        remoteDays={historySummary?.remote_days || 0}
+        pendingLeavesCount={pendingLeavesCount}
+        leaveBalance={leaveBalance}
       />
 
       <UserAttendanceChart records={historyRecords} />

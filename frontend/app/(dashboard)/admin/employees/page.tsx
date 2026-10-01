@@ -124,10 +124,10 @@ export default function EmployeeManagementPage() {
           <div className="flex items-center space-x-2">
             <UserPlus className="w-6 h-6 text-indigo-600 dark:text-indigo-400 shrink-0" />
             <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
-              Workforce Directory Management
+              Employees
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="hidden sm:block text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
             Manage organization employee profiles, roles, shift schedules, and access states
           </p>
         </div>
@@ -219,6 +219,15 @@ export default function EmployeeManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push(`/admin/attendance?user=${emp.id}`)}
+                    className="w-full text-xs justify-center col-span-2"
+                  >
+                    <CalendarClock className="w-3.5 h-3.5 mr-1" />
+                    <span>Attendance</span>
+                  </Button>
                   {emp.id !== user.id && (
                     <Button
                       variant="secondary"

@@ -18,7 +18,7 @@ export const Navbar: React.FC = () => {
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
-    <nav className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-white/90 dark:bg-gray-900/90">
+    <nav className="safe-top bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-40 backdrop-blur-md bg-white/90 dark:bg-gray-900/90">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand */}
@@ -44,7 +44,7 @@ export const Navbar: React.FC = () => {
 
           {/* Desktop Navigation Links */}
           {user && (
-            <div className="hidden md:flex items-center space-x-1">
+            <div className="hidden lg:flex items-center space-x-1">
               {user.role === 'admin' ? (
                 <>
                   <Link
@@ -124,7 +124,7 @@ export const Navbar: React.FC = () => {
           )}
 
           {/* Desktop User Controls */}
-          <div className="hidden md:flex items-center space-x-3">
+          <div className="hidden lg:flex items-center space-x-3">
             <ThemeToggle />
             {user && <NotificationBell />}
 
@@ -158,7 +158,7 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Mobile Right Bar Items & Hamburger Button */}
-          <div className="flex md:hidden items-center space-x-2">
+          <div className="flex lg:hidden items-center space-x-2">
             <ThemeToggle />
             {user && <NotificationBell />}
 
@@ -177,7 +177,7 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Drawer Overlay & Sliding Panel */}
       {user && isMobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 pt-3 pb-6 space-y-4 shadow-2xl animate-in slide-in-from-top duration-200">
+        <div className="lg:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 pt-3 pb-6 space-y-4 shadow-2xl animate-in slide-in-from-top duration-200">
           {/* User Profile Header in Mobile Drawer */}
           <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/80 border border-gray-100 dark:border-gray-700/60 flex items-center justify-between">
             <div className="flex items-center space-x-3">

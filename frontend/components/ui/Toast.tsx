@@ -37,8 +37,8 @@ export const Toast: React.FC<ToastProps> = ({
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center px-4 py-3 rounded-2xl shadow-xl border border-white/10 animate-slide-up backdrop-blur-sm">
-      <div className={`flex items-center px-4 py-3 rounded-2xl ${styles[type]}`}>
+    <div role="status" aria-live="polite" className="fixed left-3 right-3 sm:left-auto sm:right-6 sm:max-w-md z-[60] flex items-center rounded-2xl shadow-xl border border-white/10 animate-slide-up backdrop-blur-sm" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+      <div className={`flex w-full items-center px-4 py-3 rounded-2xl text-sm ${styles[type]}`}>
         {icons[type]}
         <span className="text-sm font-semibold">{message}</span>
         <button

@@ -119,7 +119,7 @@ export default function ReportsPage() {
           </button>
           <div>
             <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">Attendance Reports</h1>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="hidden sm:block text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
               Monthly summary for payroll, with office vs work-from-home breakdown
             </p>
           </div>
@@ -170,7 +170,7 @@ export default function ReportsPage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
         {stats.map(s => (
-          <div key={s.label} className={`p-4 rounded-3xl border ${toneClass[s.tone]}`}>
+          <div key={s.label} className={`p-4 rounded-3xl border ${toneClass[s.tone]} last:col-span-2 sm:last:col-span-1`}>
             <p className="text-[10px] sm:text-xs font-bold uppercase opacity-70">{s.label}</p>
             <p className="text-xl sm:text-2xl font-black mt-1">{s.value}</p>
           </div>

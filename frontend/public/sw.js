@@ -1,8 +1,8 @@
 // Service worker: installable PWA + offline fallback.
 // Only same-origin static assets are cached. Pages are network-first (so a new
 // deploy is picked up immediately) and API / Supabase calls are never cached.
-const CACHE_NAME = 'softnix-attend-v2';
-const PRECACHE = ['/manifest.json', '/softnix-logo.jpg'];
+const CACHE_NAME = 'softnix-attend-v4';
+const PRECACHE = ['/manifest.json', '/softnix-logo.jpg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -54,7 +54,7 @@ self.addEventListener('notificationclick', (event) => {
 
 const OFFLINE_HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title></head>
 <body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb;color:#111827">
-<div style="text-align:center;padding:24px"><h1 style="font-size:20px">You are offline</h1><p style="color:#6b7280">Reconnect to clock in or view your attendance.</p></div></body></html>`;
+<div style="text-align:center;padding:24px"><h1 style="font-size:20px">You are offline</h1><p style="color:#6b7280">Reconnect to clock in or view your attendance.</p><button onclick="location.reload()" style="margin-top:12px;padding:12px 24px;border:0;border-radius:14px;background:#4F46E5;color:#fff;font-weight:700;font-size:15px">Retry</button></div><script>addEventListener("online",function(){location.reload()})</script></body></html>`;
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;

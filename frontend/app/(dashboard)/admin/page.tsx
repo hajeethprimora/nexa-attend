@@ -91,17 +91,17 @@ export default function AdminPage() {
   const remoteCount = usersStatus.filter(u => (u.status === 'Clocked In' || u.status === 'On Break') && u.work_mode === 'remote').length;
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-fade-in">
+    <div className="space-y-4 sm:space-y-8 animate-fade-in">
       {/* Admin Header Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-4 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
         <div>
           <div className="flex items-center space-x-2">
             <ShieldCheck className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
+            <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
               Admin Command Center
             </h1>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="hidden sm:block text-sm text-gray-500 dark:text-gray-400 mt-1">
             Real-time workforce presence, overtime tracking, and leave governance
           </p>
         </div>
@@ -144,41 +144,41 @@ export default function AdminPage() {
             onClick={() => router.push('/admin/reports')}
           >
             <FileText className="w-4 h-4 mr-1.5" />
-            <span>Payroll Reports</span>
+            <span>Reports</span>
           </Button>
         </div>
       </div>
 
       {/* Team Live Stats Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 flex items-center justify-between">
+        <div className="p-4 sm:p-5 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Clocked In Now</p>
-            <p className="text-3xl font-black text-emerald-900 dark:text-emerald-100 mt-1">{activeCount} Staff</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Clocked In Now</p>
+            <p className="text-2xl sm:text-3xl font-black text-emerald-900 dark:text-emerald-100 mt-1">{activeCount} Staff</p>
           </div>
           <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping" />
         </div>
 
-        <div className="p-5 rounded-3xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 flex items-center justify-between">
+        <div className="p-4 sm:p-5 rounded-3xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Working From Home</p>
-            <p className="text-3xl font-black text-indigo-900 dark:text-indigo-100 mt-1">{remoteCount} Staff</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Working From Home</p>
+            <p className="text-2xl sm:text-3xl font-black text-indigo-900 dark:text-indigo-100 mt-1">{remoteCount} Staff</p>
           </div>
           <Home className="w-5 h-5 text-indigo-500" />
         </div>
 
-        <div className="p-5 rounded-3xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900 flex items-center justify-between">
+        <div className="p-4 sm:p-5 rounded-3xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900 flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">On Active Break</p>
-            <p className="text-3xl font-black text-amber-900 dark:text-amber-100 mt-1">{breakCount} Staff</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">On Active Break</p>
+            <p className="text-2xl sm:text-3xl font-black text-amber-900 dark:text-amber-100 mt-1">{breakCount} Staff</p>
           </div>
           <div className="w-3.5 h-3.5 rounded-full bg-amber-500" />
         </div>
 
-        <div className="p-5 rounded-3xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900 flex items-center justify-between">
+        <div className="p-4 sm:p-5 rounded-3xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900 flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">Offline / Shift End</p>
-            <p className="text-3xl font-black text-rose-900 dark:text-rose-100 mt-1">{offlineCount} Staff</p>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">Offline / Shift End</p>
+            <p className="text-2xl sm:text-3xl font-black text-rose-900 dark:text-rose-100 mt-1">{offlineCount} Staff</p>
           </div>
           <div className="w-3.5 h-3.5 rounded-full bg-rose-500" />
         </div>

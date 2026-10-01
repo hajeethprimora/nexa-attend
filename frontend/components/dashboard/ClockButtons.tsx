@@ -51,34 +51,34 @@ export const ClockButtons: React.FC<ClockButtonsProps> = ({
       }`}
     >
       <Icon className="w-4 h-4" />
-      {label}
+      {label === 'WFH' ? <><span className="sm:hidden">WFH</span><span className="hidden sm:inline">Work from Home</span></> : label}
     </button>
   );
 
   return (
     <Card
       header={
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-extrabold text-gray-900 dark:text-gray-100">Time Tracker</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Clock in from the office or from home</p>
+        <div className="flex items-start sm:items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-gray-100">Time Tracker</h2>
+            <p className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Clock in from the office or from home</p>
           </div>
-          <div className="flex items-center space-x-2">
-            <span className="relative flex h-3 w-3">
+          <div className="flex items-center space-x-2 shrink-0 px-3 py-1.5 rounded-full bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
+            <span className="relative flex h-2.5 w-2.5">
               {isClockedIn && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
-              <span className={`relative inline-flex rounded-full h-3 w-3 ${
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
                 isClockedIn ? 'bg-emerald-500' : isOnBreak ? 'bg-amber-500' : 'bg-gray-400'
               }`} />
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 whitespace-nowrap">
               {status}{activeMode ? ` · ${activeMode === 'remote' ? 'WFH' : 'Office'}` : ''}
             </span>
           </div>
         </div>
       }
     >
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 text-center">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 text-center">
           <div>
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Clock In</p>
             <p className="text-lg font-extrabold text-gray-900 dark:text-gray-100">{formatTime(todayRecord?.clock_in)}</p>
@@ -104,7 +104,7 @@ export const ClockButtons: React.FC<ClockButtonsProps> = ({
             {allowRemote && (
               <div className="flex gap-3" role="group" aria-label="Work location">
                 {modeButton('office', 'Office', Building2)}
-                {modeButton('remote', 'Work from Home', Home)}
+                {modeButton('remote', 'WFH', Home)}
               </div>
             )}
             <Button

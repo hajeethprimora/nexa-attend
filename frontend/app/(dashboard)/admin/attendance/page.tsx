@@ -130,7 +130,7 @@ function AttendanceEditor() {
             <CalendarClock className="w-6 h-6 text-indigo-600 dark:text-indigo-400 shrink-0" />
             <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">Attendance Editor</h1>
           </div>
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="hidden sm:block text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
             Correct past records, add missed days or fix forgotten clock-outs. Every change is audit-logged and the employee is notified.
           </p>
         </div>
@@ -192,7 +192,43 @@ function AttendanceEditor() {
             </div>
           )}
 
-          <div className="overflow-x-auto -mx-6">
+          {/* Phones: one card per session */}
+          <div className="md:hidden space-y-3">
+            {isLoading ? (
+              <p className="py-8 text-center text-xs text-gray-400">Loading…</p>
+            ) : !data || data.records.length === 0 ? (
+              <p className="py-8 text-center text-xs text-gray-400">No attendance records for this month.</p>
+            ) : (
+              data.records.map(r => (
+                <div key={r.id} className={`p-4 rounded-2xl border space-y-3 ${r.auto_closed ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900' : 'bg-gray-50 dark:bg-gray-800/60 border-gray-100 dark:border-gray-800'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatDateLabel(r.date)} <ModeBadge mode={r.work_mode} /></span>
+                    <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{Number(r.total_hours || 0).toFixed(2)} h</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div><span className="block text-[10px] font-bold uppercase text-gray-400">In</span>{formatTime(r.clock_in, tz)}{r.late_minutes ? <span className="ml-1 text-amber-600">+{r.late_minutes}m</span> : null}</div>
+                    <div><span className="block text-[10px] font-bold uppercase text-gray-400">Out</span>{r.clock_out ? formatTime(r.clock_out, tz) : 'Open'}</div>
+                    <div><span className="block text-[10px] font-bold uppercase text-gray-400">Breaks</span>{(r.breaks || []).length || '-'}</div>
+                  </div>
+                  {(r.auto_closed || r.edited_at) && (
+                    <p className="text-xs">
+                      {r.auto_closed ? <span className="font-bold text-rose-600">Missed clock-out: please correct</span> : <span className="text-indigo-600">Edited: {r.edit_reason}</span>}
+                    </p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" className="py-2.5" onClick={() => { setEditing(r); setModalOpen(true); }}>
+                      <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" className="py-2.5 text-rose-600" onClick={() => handleDelete(r)}>
+                      <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto -mx-6">
             <div className="inline-block min-w-full align-middle px-6">
               <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
                 <thead>

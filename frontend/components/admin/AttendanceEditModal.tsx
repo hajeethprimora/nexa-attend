@@ -123,12 +123,11 @@ export const AttendanceEditModal: React.FC<Props> = ({ isOpen, onClose, record, 
           </div>
           {breaks.length === 0 && <p className="text-xs text-gray-400">No breaks.</p>}
           {breaks.map((b, i) => (
-            <div key={i} className="flex items-end gap-2">
-              <Input aria-label={`Break ${i + 1} start`} type="time" value={b.start} onChange={(e) => updateBreak(i, 'start', e.target.value)} />
-              <span className="pb-3 text-gray-400">to</span>
-              <Input aria-label={`Break ${i + 1} end`} type="time" value={b.end} onChange={(e) => updateBreak(i, 'end', e.target.value)} />
-              <Button type="button" variant="ghost" size="sm" className="mb-1" onClick={() => setBreaks(prev => prev.filter((_, j) => j !== i))} aria-label="Remove break">
-                <Trash2 className="w-4 h-4 text-rose-500" />
+            <div key={i} className="grid grid-cols-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 p-2 sm:p-0 rounded-2xl border sm:border-0 border-gray-100 dark:border-gray-800">
+              <div className="min-w-0"><Input aria-label={`Break ${i + 1} start`} type="time" value={b.start} className="px-3" onChange={(e) => updateBreak(i, 'start', e.target.value)} /></div>
+              <div className="min-w-0"><Input aria-label={`Break ${i + 1} end`} type="time" value={b.end} className="px-3" onChange={(e) => updateBreak(i, 'end', e.target.value)} /></div>
+              <Button type="button" variant="ghost" size="sm" className="col-span-2 sm:col-span-1 text-rose-500" onClick={() => setBreaks(prev => prev.filter((_, j) => j !== i))} aria-label="Remove break">
+                <Trash2 className="w-4 h-4 sm:mr-0 mr-1.5" /><span className="sm:hidden">Remove break</span>
               </Button>
             </div>
           ))}
