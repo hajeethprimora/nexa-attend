@@ -1,56 +1,64 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { AttendanceRecord, MonthlyReportRow, User } from '../types';
+import { AttendanceRecord, AttendanceSummary, MonthlyReportRow, User } from '../types';
+import { formatTime } from './dates';
+
+const BRAND: [number, number, number] = [79, 70, 229];
+
+const header = (doc: jsPDF, title: string, lines: string[]) => {
+  doc.setFontSize(18);
+  doc.setTextColor(...BRAND);
+  doc.text(title, 14, 20);
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139);
+  lines.forEach((line, i) => doc.text(line, 14, 28 + i * 6));
+};
 
 export const exportMonthlyTimesheetPDF = (
   user: User,
   month: string,
   records: AttendanceRecord[],
-  summary: { total_hours: number; total_overtime_hours?: number; total_late_minutes?: number; days_worked: number } | null
+  summary: AttendanceSummary | null,
+  timeZone?: string
 ) => {
   const doc = new jsPDF();
 
-  // Header Title
-  doc.setFontSize(18);
-  doc.setTextColor(79, 70, 229); // Primary Indigo
-  doc.text('SOFTNIX - Monthly Attendance Timesheet', 14, 20);
+  header(doc, 'SOFTNIX - Monthly Attendance Timesheet', [
+    `Employee: ${user.full_name} (${user.employee_id})`,
+    `Department: ${user.department} | Period: ${month}${timeZone ? ` | Times in ${timeZone}` : ''}`,
+    `Generated: ${new Date().toLocaleString()}`
+  ]);
 
-  doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Employee Name: ${user.full_name} (${user.employee_id})`, 14, 28);
-  doc.text(`Department: ${user.department} | Period: ${month}`, 14, 34);
-  doc.text(`Generated On: ${new Date().toLocaleDateString()} | Softnix Workforce Systems`, 14, 40);
-
-  // Summary box
   doc.setDrawColor(226, 232, 240);
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(14, 46, 182, 18, 3, 3, 'FD');
-
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Total Days Worked: ${summary?.days_worked || 0}`, 20, 57);
-  doc.text(`Total Hours: ${summary?.total_hours || 0} hrs`, 75, 57);
-  doc.text(`Overtime: ${summary?.total_overtime_hours || 0} hrs`, 130, 57);
+  doc.text(`Days: ${summary?.days_worked || 0} (Office ${summary?.office_days || 0} / WFH ${summary?.remote_days || 0})`, 18, 57);
+  doc.text(`Hours: ${summary?.total_hours || 0}`, 95, 57);
+  doc.text(`Overtime: ${summary?.total_overtime_hours || 0}`, 128, 57);
+  doc.text(`Late days: ${summary?.late_days || 0}`, 165, 57);
+  doc.setFont('helvetica', 'normal');
 
-  // Table Data
-  const tableData = records.map((r) => [
-    r.date,
-    r.clock_in ? new Date(r.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
-    r.clock_out ? new Date(r.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Open',
-    `${r.total_hours || 0} hrs`,
-    `${r.overtime_hours || 0} hrs`,
-    r.late_minutes ? `${r.late_minutes} min` : 'On Time'
-  ]);
-
+  const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date) || a.clock_in.localeCompare(b.clock_in));
   autoTable(doc, {
     startY: 70,
-    head: [['Date', 'Clock In', 'Clock Out', 'Worked Hours', 'Overtime', 'Late Arrival']],
-    body: tableData,
+    head: [['Date', 'Mode', 'Clock In', 'Clock Out', 'Hours', 'Overtime', 'Late', 'Notes']],
+    body: sorted.map((r) => [
+      r.date,
+      r.work_mode === 'remote' ? 'WFH' : 'Office',
+      formatTime(r.clock_in, timeZone),
+      r.clock_out ? formatTime(r.clock_out, timeZone) : 'Open',
+      Number(r.total_hours || 0).toFixed(2),
+      Number(r.overtime_hours || 0).toFixed(2),
+      r.late_minutes ? `${r.late_minutes}m` : '-',
+      [r.auto_closed ? 'Missed clock-out' : '', r.edited_at ? 'Edited by admin' : ''].filter(Boolean).join(', ')
+    ]),
     theme: 'grid',
-    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
+    headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [249, 250, 251] },
-    styles: { fontSize: 9 }
+    styles: { fontSize: 8 }
   });
 
   doc.save(`Softnix_Timesheet_${user.employee_id}_${month}.pdf`);
@@ -58,37 +66,37 @@ export const exportMonthlyTimesheetPDF = (
 
 export const exportAdminSummaryPDF = (
   month: string,
-  reportData: MonthlyReportRow[]
+  reportData: MonthlyReportRow[],
+  workingDays?: number
 ) => {
-  const doc = new jsPDF();
+  const doc = new jsPDF({ orientation: 'landscape' });
 
-  doc.setFontSize(18);
-  doc.setTextColor(79, 70, 229);
-  doc.text('SOFTNIX - Corporate Monthly Attendance Report', 14, 20);
-
-  doc.setFontSize(10);
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Report Period: ${month} | Total Workforce: ${reportData.length}`, 14, 28);
-  doc.text(`Generated On: ${new Date().toLocaleDateString()} | Softnix Workforce Systems`, 14, 34);
-
-  const tableData = reportData.map((row) => [
-    row.employee_id,
-    row.full_name,
-    row.department,
-    `${row.total_days_worked} days`,
-    `${row.leaves_taken} days`,
-    `${row.total_hours_worked} hrs`,
-    `${row.total_overtime_hours || 0} hrs`
+  header(doc, 'SOFTNIX - Monthly Attendance Report', [
+    `Period: ${month} | Employees: ${reportData.length}${workingDays !== undefined ? ` | Working days in month: ${workingDays}` : ''}`,
+    `Generated: ${new Date().toLocaleString()}`
   ]);
 
   autoTable(doc, {
     startY: 42,
-    head: [['Emp ID', 'Full Name', 'Department', 'Days Worked', 'Leaves', 'Total Hours', 'Overtime']],
-    body: tableData,
+    head: [['Emp ID', 'Name', 'Department', 'Present', 'Office', 'WFH', 'Hours', 'Overtime', 'Late Days', 'Leave', 'Absent', 'Missed Out']],
+    body: reportData.map((row) => [
+      row.employee_id,
+      row.full_name,
+      row.department,
+      row.total_days_worked,
+      row.office_days,
+      row.remote_days,
+      Number(row.total_hours_worked || 0).toFixed(1),
+      Number(row.total_overtime_hours || 0).toFixed(1),
+      row.late_days,
+      row.leaves_taken,
+      row.absent_days,
+      row.missed_clock_outs
+    ]),
     theme: 'striped',
-    headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
-    styles: { fontSize: 9 }
+    headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 8 }
   });
 
-  doc.save(`Softnix_Executive_Report_${month}.pdf`);
+  doc.save(`Softnix_Attendance_Report_${month}.pdf`);
 };

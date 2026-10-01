@@ -1,12 +1,13 @@
 import express from 'express';
-import { login, signup, me } from '../controllers/authController';
+import { signup, me, publicConfig, notifications } from '../controllers/authController';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { validateLogin, validateSignup } from '../validators/authValidators';
+import { validateSignup } from '../validators/authValidators';
 
 const router = express.Router();
 
-router.post('/login', validateLogin, login);
+router.get('/config', publicConfig);
 router.post('/signup', validateSignup, signup);
 router.get('/me', authMiddleware, me);
+router.get('/notifications', authMiddleware, notifications);
 
 export default router;

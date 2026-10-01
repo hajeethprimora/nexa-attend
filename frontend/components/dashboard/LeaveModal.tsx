@@ -5,7 +5,7 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Badge from '../ui/Badge';
-import api from '../../lib/axiosInstance';
+import api, { apiErrorMessage } from '../../lib/axiosInstance';
 import { LeaveRequest, LeaveType } from '../../types';
 
 interface LeaveModalProps {
@@ -13,13 +13,15 @@ interface LeaveModalProps {
   onClose: () => void;
   leaves: LeaveRequest[];
   onLeaveSubmitted: () => void;
+  onLeaveCancelled?: () => void;
 }
 
 export const LeaveModal: React.FC<LeaveModalProps> = ({
   isOpen,
   onClose,
   leaves,
-  onLeaveSubmitted
+  onLeaveSubmitted,
+  onLeaveCancelled
 }) => {
   const [activeTab, setActiveTab] = useState<'apply' | 'history'>('apply');
   const [startDate, setStartDate] = useState('');
@@ -28,6 +30,29 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  const workingDays = (() => {
+    if (!startDate || !endDate || startDate > endDate) return 0;
+    let count = 0;
+    for (let d = new Date(`${startDate}T00:00:00`); d <= new Date(`${endDate}T00:00:00`); d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+    }
+    return count;
+  })();
+
+  const handleCancel = async (id: string) => {
+    if (!window.confirm('Cancel this pending leave request?')) return;
+    setCancellingId(id);
+    try {
+      await api.delete(`/leaves/${id}`);
+      onLeaveCancelled?.();
+    } catch (err: any) {
+      setErrorMessage(apiErrorMessage(err, 'Failed to cancel leave request'));
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +75,7 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
         setReason('');
       }
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.message || 'Failed to submit leave request');
+      setErrorMessage(apiErrorMessage(err, 'Failed to submit leave request'));
     } finally {
       setIsSubmitting(false);
     }
@@ -83,6 +108,12 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
           </button>
         </div>
 
+        {activeTab === 'history' && errorMessage && (
+          <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-xs font-semibold text-rose-600 dark:text-rose-400">
+            {errorMessage}
+          </div>
+        )}
+
         {activeTab === 'apply' ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             {errorMessage && (
@@ -104,9 +135,16 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                min={startDate || undefined}
                 required
               />
             </div>
+
+            {workingDays > 0 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                This request uses <span className="font-bold text-gray-900 dark:text-gray-100">{workingDays} working day{workingDays === 1 ? '' : 's'}</span> (weekends are not counted).
+              </p>
+            )}
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
@@ -163,6 +201,17 @@ export const LeaveModal: React.FC<LeaveModalProps> = ({
                     {l.start_date} to {l.end_date}
                   </p>
                   {l.reason && <p className="text-xs text-gray-600 dark:text-gray-300 italic">"{l.reason}"</p>}
+                  {l.status === 'pending' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      isLoading={cancellingId === l.id}
+                      onClick={() => handleCancel(l.id)}
+                    >
+                      Cancel request
+                    </Button>
+                  )}
                   {l.admin_comment && (
                     <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">
                       Admin Note: {l.admin_comment}

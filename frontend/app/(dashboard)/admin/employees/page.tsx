@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Search, Filter, Edit, CheckCircle, XCircle, Clock, ShieldCheck, ShieldAlert } from 'lucide-react';
-import { useAuth } from '../../../../context/AuthContext';
-import api from '../../../../lib/axiosInstance';
+import { UserPlus, Search, Filter, Edit, CheckCircle, XCircle, Clock, ShieldCheck, ShieldAlert, CalendarClock } from 'lucide-react';
+import { useRequireAuth } from '../../../../context/AuthContext';
+import api, { apiErrorMessage } from '../../../../lib/axiosInstance';
+import { DEPARTMENTS } from '../../../../lib/dates';
 import Card from '../../../../components/ui/Card';
 import Button from '../../../../components/ui/Button';
 import Badge from '../../../../components/ui/Badge';
@@ -13,10 +14,11 @@ import EmployeeModal from '../../../../components/admin/EmployeeModal';
 import { User } from '../../../../types';
 
 export default function EmployeeManagementPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, ready } = useRequireAuth(true);
   const router = useRouter();
 
   const [employees, setEmployees] = useState<User[]>([]);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +32,11 @@ export default function EmployeeManagementPage() {
   const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToast({ message, type });
   };
+
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput.trim()), 400);
+    return () => clearTimeout(id);
+  }, [searchInput]);
 
   const fetchEmployees = useCallback(async () => {
     setIsLoading(true);
@@ -45,24 +52,15 @@ export default function EmployeeManagementPage() {
         setEmployees(res.data.data || []);
       }
     } catch (err) {
-      console.error('Error fetching employees:', err);
-      showToast('Failed to load employee list', 'error');
+      showToast(apiErrorMessage(err, 'Failed to load employee list'), 'error');
     } finally {
       setIsLoading(false);
     }
   }, [search, selectedDepartment]);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role !== 'admin') {
-        router.push('/dashboard');
-      } else {
-        fetchEmployees();
-      }
-    }
-  }, [user, authLoading, router, fetchEmployees]);
+    if (ready) fetchEmployees();
+  }, [ready, fetchEmployees]);
 
   const handleSaveEmployee = async (formData: any, employeeId?: string) => {
     try {
@@ -84,24 +82,19 @@ export default function EmployeeManagementPage() {
         }
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Failed to save employee profile';
-      showToast(msg, 'error');
-      throw err;
+      // The modal displays the error inline
+      throw new Error(apiErrorMessage(err, 'Failed to save employee profile'));
     }
   };
 
   const handleToggleRole = async (targetUser: User) => {
     const newRole = targetUser.role === 'admin' ? 'employee' : 'admin';
+    const question = newRole === 'admin'
+      ? `Give ${targetUser.full_name} full administrator access (all employee data, edits and reports)?`
+      : `Remove administrator access from ${targetUser.full_name}?`;
+    if (!window.confirm(question)) return;
     try {
-      const res = await api.put(`/admin/employees/${targetUser.id}`, {
-        employee_id: targetUser.employee_id,
-        full_name: targetUser.full_name,
-        department: targetUser.department,
-        role: newRole,
-        shift_start: targetUser.shift_start || '09:00:00',
-        shift_end: targetUser.shift_end || '17:00:00',
-        is_active: targetUser.is_active ?? true
-      });
+      const res = await api.put(`/admin/employees/${targetUser.id}`, { role: newRole });
 
       if (res.data?.success) {
         showToast(
@@ -111,12 +104,11 @@ export default function EmployeeManagementPage() {
         fetchEmployees();
       }
     } catch (err) {
-      console.error('Error changing user role:', err);
-      showToast('Failed to update user role', 'error');
+      showToast(apiErrorMessage(err, 'Failed to update user role'), 'error');
     }
   };
 
-  if (authLoading || !user || user.role !== 'admin') {
+  if (!ready || !user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -159,9 +151,9 @@ export default function EmployeeManagementPage() {
           <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search employee by name or ID..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, ID or email..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
@@ -174,13 +166,7 @@ export default function EmployeeManagementPage() {
             className="w-full sm:w-auto px-4 py-2.5 rounded-2xl text-xs sm:text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="">All Departments</option>
-            <option value="Engineering">Engineering</option>
-            <option value="Product">Product</option>
-            <option value="Design">Design</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Sales">Sales</option>
-            <option value="HR">HR & Operations</option>
-            <option value="Finance">Finance</option>
+            {DEPARTMENTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
           </select>
         </div>
       </div>
@@ -355,6 +341,15 @@ export default function EmployeeManagementPage() {
                         )}
 
                         <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/admin/attendance?user=${emp.id}`)}
+                          title="View / edit attendance"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                        </Button>
+
+                        <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
@@ -380,7 +375,8 @@ export default function EmployeeManagementPage() {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         employee={selectedEmployee}
-        defaultDepartment={selectedDepartment || 'Design'}
+        defaultDepartment={selectedDepartment || 'Engineering'}
+        currentUserId={user.id}
         onSave={handleSaveEmployee}
       />
 

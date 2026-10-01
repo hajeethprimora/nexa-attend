@@ -5,17 +5,19 @@ import { Check, X, Inbox } from 'lucide-react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
-import api from '../../lib/axiosInstance';
+import api, { apiErrorMessage } from '../../lib/axiosInstance';
 import { LeaveRequest } from '../../types';
 
 interface LeaveApprovalPanelProps {
   pendingLeaves: LeaveRequest[];
-  onLeaveUpdated: () => void;
+  onLeaveUpdated: (status: 'approved' | 'rejected') => void;
+  onError?: (message: string) => void;
 }
 
 export const LeaveApprovalPanel: React.FC<LeaveApprovalPanelProps> = ({
   pendingLeaves,
-  onLeaveUpdated
+  onLeaveUpdated,
+  onError
 }) => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -29,10 +31,10 @@ export const LeaveApprovalPanel: React.FC<LeaveApprovalPanelProps> = ({
       });
 
       if (response.data?.success) {
-        onLeaveUpdated();
+        onLeaveUpdated(status);
       }
     } catch (err) {
-      console.error('Error updating leave status:', err);
+      onError?.(apiErrorMessage(err, 'Failed to update leave request'));
     } finally {
       setProcessingId(null);
     }
@@ -65,14 +67,14 @@ export const LeaveApprovalPanel: React.FC<LeaveApprovalPanelProps> = ({
               className="p-5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
             >
               <div className="space-y-1">
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-gray-900 dark:text-gray-100">{l.employee_name}</span>
                   <span className="text-xs font-mono text-gray-400">({l.employee_id})</span>
                   <Badge variant="info">{l.department || 'Engineering'}</Badge>
                   <Badge variant="warning">{l.type}</Badge>
                 </div>
                 <p className="text-xs text-gray-600 dark:text-gray-300">
-                  Duration: <span className="font-semibold">{l.start_date} to {l.end_date}</span>
+                  Duration: <span className="font-semibold">{l.start_date} to {l.end_date}</span>{l.days !== undefined ? ` (${l.days} working day${l.days === 1 ? '' : 's'})` : ''}
                 </p>
                 {l.reason && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 italic">

@@ -1,134 +1,91 @@
-const CACHE_NAME = 'softnix-attend-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/manifest.json',
-  '/softnix-logo.jpg',
-  '/login',
-  '/signup',
-  '/dashboard'
-];
+// Service worker: installable PWA + offline fallback.
+// Only same-origin static assets are cached. Pages are network-first (so a new
+// deploy is picked up immediately) and API / Supabase calls are never cached.
+const CACHE_NAME = 'softnix-attend-v2';
+const PRECACHE = ['/manifest.json', '/softnix-logo.jpg'];
 
-// 1. Service Worker Install Event - Cache Core Assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-caching core PWA static assets');
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[SW] Cache addAll warning:', err);
-      });
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE).catch(() => undefined))
+      .then(() => self.skipWaiting())
   );
 });
 
-// 2. Service Worker Activate Event - Clean Up Old Caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cache);
-            return caches.delete(cache);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys()
+      .then((names) => Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))))
+      .then(() => self.clients.claim())
   );
 });
 
-// 3. Web Push Event - Display Native OS Notifications
 self.addEventListener('push', (event) => {
-  let payload = { title: 'Softnix Attend Alert', body: 'New attendance update', url: '/dashboard' };
-
+  let payload = { title: 'Softnix Attend', body: 'New attendance update', url: '/dashboard' };
   if (event.data) {
     try {
-      payload = event.data.json();
+      payload = { ...payload, ...event.data.json() };
     } catch (e) {
       payload.body = event.data.text();
     }
   }
-
-  const options = {
-    body: payload.body,
-    icon: '/softnix-logo.jpg',
-    badge: '/softnix-logo.jpg',
-    data: { url: payload.url || '/dashboard' }
-  };
-
   event.waitUntil(
-    self.registration.showNotification(payload.title, options)
-  );
-});
-
-// 4. Notification Click Event - Open PWA App Window
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const targetUrl = event.notification.data?.url || '/dashboard';
-
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.includes(targetUrl) && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl);
-      }
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: '/softnix-logo.jpg',
+      badge: '/softnix-logo.jpg',
+      data: { url: payload.url || '/dashboard' }
     })
   );
 });
 
-// 5. Service Worker Fetch Event - Cache First for Assets, Network First for APIs
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/dashboard';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(targetUrl) && 'focus' in client) return client.focus();
+      }
+      return self.clients.openWindow ? self.clients.openWindow(targetUrl) : undefined;
+    })
+  );
+});
+
+const OFFLINE_HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title></head>
+<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb;color:#111827">
+<div style="text-align:center;padding:24px"><h1 style="font-size:20px">You are offline</h1><p style="color:#6b7280">Reconnect to clock in or view your attendance.</p></div></body></html>`;
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  if (req.method !== 'GET') return;
+
   const url = new URL(req.url);
+  // Never touch cross-origin requests (backend API, Supabase auth, fonts CDN)
+  if (url.origin !== self.location.origin) return;
 
-  // Skip non-GET requests or browser extension requests
-  if (req.method !== 'GET' || !url.protocol.startsWith('http')) {
-    return;
-  }
-
-  // Network-first strategy for API endpoints (/api/*)
-  if (url.pathname.includes('/api/')) {
+  // Page navigations: always go to the network; show a small offline page if that fails
+  if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
-        .then((response) => {
-          return response;
-        })
-        .catch(() => {
-          return caches.match(req).then((cachedResponse) => {
-            if (cachedResponse) return cachedResponse;
-            return new Response(
-              JSON.stringify({
-                success: false,
-                message: 'You are currently offline. Please check your network connection.',
-                offline: true
-              }),
-              { headers: { 'Content-Type': 'application/json' } }
-            );
-          });
-        })
+      fetch(req).catch(() => new Response(OFFLINE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }))
     );
     return;
   }
 
-  // Stale-while-revalidate / Cache-first strategy for UI static bundles and images
-  event.respondWith(
-    caches.match(req).then((cachedResponse) => {
-      const fetchPromise = fetch(req).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(req, responseClone);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        return cachedResponse;
-      });
+  // Immutable hashed build assets and images: cache-first
+  const isStatic = url.pathname.startsWith('/_next/static/') || /\.(png|jpe?g|svg|ico|webp|woff2?)$/.test(url.pathname);
+  if (!isStatic) return;
 
-      return cachedResponse || fetchPromise;
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+        }
+        return response;
+      });
     })
   );
 });

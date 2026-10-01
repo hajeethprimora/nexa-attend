@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, RefreshCw, FileText, ScrollText } from 'lucide-react';
-import { useAuth } from '../../../context/AuthContext';
-import api from '../../../lib/axiosInstance';
+import { ShieldCheck, RefreshCw, FileText, ScrollText, Home, CalendarClock } from 'lucide-react';
+import { useRequireAuth } from '../../../context/AuthContext';
+import api, { apiErrorMessage } from '../../../lib/axiosInstance';
+import { localMonth } from '../../../lib/dates';
 import UserStatusTable from '../../../components/admin/UserStatusTable';
 import LeaveApprovalPanel from '../../../components/admin/LeaveApprovalPanel';
 import AuditLogsModal from '../../../components/admin/AuditLogsModal';
@@ -14,7 +15,7 @@ import Button from '../../../components/ui/Button';
 import { EmployeeStatus, LeaveRequest, AuditLog, MonthlyReportRow } from '../../../types';
 
 export default function AdminPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { ready } = useRequireAuth(true);
   const router = useRouter();
 
   const [usersStatus, setUsersStatus] = useState<EmployeeStatus[]>([]);
@@ -38,7 +39,7 @@ export default function AdminPage() {
       const [usersRes, leavesRes, reportsRes] = await Promise.all([
         api.get('/admin/users'),
         api.get('/admin/leaves/pending'),
-        api.get('/admin/reports')
+        api.get(`/admin/reports?month=${localMonth()}`)
       ]);
 
       if (usersRes.data?.success) {
@@ -51,8 +52,7 @@ export default function AdminPage() {
         setReportData(reportsRes.data.data || []);
       }
     } catch (err) {
-      console.error('Error loading admin data:', err);
-      showToast('Failed to load admin dashboard data', 'error');
+      showToast(apiErrorMessage(err, 'Failed to load admin dashboard data'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -70,18 +70,14 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role !== 'admin') {
-        router.push('/dashboard');
-      } else {
-        fetchAdminData();
-      }
-    }
-  }, [user, authLoading, router, fetchAdminData]);
+    if (!ready) return;
+    fetchAdminData();
+    // Keep the live presence view fresh
+    const id = setInterval(fetchAdminData, 120000);
+    return () => clearInterval(id);
+  }, [ready, fetchAdminData]);
 
-  if (authLoading || !user || user.role !== 'admin') {
+  if (!ready) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -92,6 +88,7 @@ export default function AdminPage() {
   const activeCount = usersStatus.filter(u => u.status === 'Clocked In').length;
   const breakCount = usersStatus.filter(u => u.status === 'On Break').length;
   const offlineCount = usersStatus.filter(u => u.status === 'Offline' || u.status === 'Clocked Out').length;
+  const remoteCount = usersStatus.filter(u => (u.status === 'Clocked In' || u.status === 'On Break') && u.work_mode === 'remote').length;
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in">
@@ -109,7 +106,16 @@ export default function AdminPage() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/admin/attendance')}
+          >
+            <CalendarClock className="w-4 h-4 mr-1.5" />
+            <span>Edit Attendance</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -144,13 +150,21 @@ export default function AdminPage() {
       </div>
 
       {/* Team Live Stats Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 flex items-center justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Clocked In Now</p>
             <p className="text-3xl font-black text-emerald-900 dark:text-emerald-100 mt-1">{activeCount} Staff</p>
           </div>
           <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping" />
+        </div>
+
+        <div className="p-5 rounded-3xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Working From Home</p>
+            <p className="text-3xl font-black text-indigo-900 dark:text-indigo-100 mt-1">{remoteCount} Staff</p>
+          </div>
+          <Home className="w-5 h-5 text-indigo-500" />
         </div>
 
         <div className="p-5 rounded-3xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900 flex items-center justify-between">
@@ -173,10 +187,11 @@ export default function AdminPage() {
       {/* Pending Leave Requests Inbox */}
       <LeaveApprovalPanel
         pendingLeaves={pendingLeaves}
-        onLeaveUpdated={() => {
+        onLeaveUpdated={(status) => {
           fetchAdminData();
-          showToast('Leave request status updated successfully', 'success');
+          showToast(`Leave request ${status}`, 'success');
         }}
+        onError={(message) => showToast(message, 'error')}
       />
 
       {/* Analytics Chart */}

@@ -8,6 +8,7 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   defaultMeta: { service: 'nexa-attend-backend' },
+  silent: process.env.NODE_ENV === 'test',
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(

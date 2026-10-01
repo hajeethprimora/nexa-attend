@@ -1,382 +1,205 @@
+import { z } from 'zod';
 import supabase from '../utils/supabaseClient';
 import logger from '../utils/logger';
+import config from '../config';
 import { logAuditEvent } from '../utils/auditLogger';
-import { sendLeaveStatusNotification } from '../utils/emailClient';
-import { sendLeaveDecisionNotification } from '../utils/emailService';
-import { AppError } from '../middleware/errorHandler';
-import { calculateDays } from './leaveService';
-import { BreakEntry } from '../types';
+import { AppError, dbError } from '../middleware/errorHandler';
+import { AttendanceRecord } from '../types';
+import { AttendanceService, getRecordStatus } from './attendanceService';
+import { LeaveService } from './leaveService';
+import { sessionNetHours } from './attendanceCalc';
+import { round2, todayInZone } from '../utils/time';
+import { employeeCreateSchema, employeeUpdateSchema } from '../validators/adminValidators';
+
+type EmployeeCreate = z.infer<typeof employeeCreateSchema>;
+type EmployeeUpdate = z.infer<typeof employeeUpdateSchema>;
+
+const toDbTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
+const BAN_FOREVER = '876000h';
 
 export class AdminService {
   static async getUsersStatus() {
-    const today = new Date().toISOString().split('T')[0];
+    await AttendanceService.closeStaleSessions();
+    const today = todayInZone(config.timeZone);
 
     const { data: users, error: usersError } = await supabase
       .from('users')
       .select('*')
+      .eq('is_active', true)
       .order('full_name', { ascending: true });
+    if (usersError) throw dbError(usersError, 'getUsersStatus users');
 
-    if (usersError) throw new AppError(usersError.message, 500, 'DB_ERROR');
-
+    // Today's sessions plus any still-open session that started before midnight
     const { data: attendanceList, error: attError } = await supabase
       .from('attendance')
       .select('*')
-      .eq('date', today);
+      .or(`date.eq.${today},clock_out.is.null`);
+    if (attError) throw dbError(attError, 'getUsersStatus attendance');
 
-    if (attError) throw new AppError(attError.message, 500, 'DB_ERROR');
-
-    const attendanceMap = new Map();
-    (attendanceList || []).forEach(att => {
-      attendanceMap.set(att.user_id, att);
+    const byUser = new Map<string, AttendanceRecord[]>();
+    (attendanceList || []).forEach((att: AttendanceRecord) => {
+      const list = byUser.get(att.user_id) || [];
+      list.push(att);
+      byUser.set(att.user_id, list);
     });
 
-    const userStatusList = (users || []).map(u => {
-      const att = attendanceMap.get(u.id);
-
-      let status = 'Offline';
-      let todayHours = 0;
-      let overtimeHours = 0;
-      let lateMinutes = 0;
-
-      if (att) {
-        todayHours = parseFloat(att.total_hours) || 0;
-        overtimeHours = parseFloat(att.overtime_hours) || 0;
-        lateMinutes = att.late_minutes || 0;
-
-        if (att.clock_in && !att.clock_out) {
-          const breaks: BreakEntry[] = Array.isArray(att.breaks) ? att.breaks : [];
-          const openBreak = breaks.find((b: BreakEntry) => b.start && !b.end);
-          if (openBreak || (att.break_start && !att.break_end)) {
-            status = 'On Break';
-          } else {
-            status = 'Clocked In';
-          }
-        } else if (att.clock_out) {
-          status = 'Clocked Out';
-        }
-      }
+    return (users || []).map(u => {
+      const sessions = (byUser.get(u.id) || []).sort((a, b) => a.clock_in.localeCompare(b.clock_in));
+      const open = sessions.find(s => !s.clock_out) || null;
+      const latest = open || sessions[sessions.length - 1] || null;
+      const todaySessions = sessions.filter(s => s.date === today);
 
       return {
         id: u.id,
         employee_id: u.employee_id,
         full_name: u.full_name,
+        email: u.email,
         role: u.role,
         department: u.department || 'Engineering',
         shift_start: u.shift_start || '09:00:00',
         shift_end: u.shift_end || '17:00:00',
         is_active: u.is_active ?? true,
-        status,
-        today_hours: todayHours,
-        overtime_hours: overtimeHours,
-        late_minutes: lateMinutes,
-        clock_in: att?.clock_in || null,
-        clock_out: att?.clock_out || null
+        allow_remote: u.allow_remote ?? true,
+        status: getRecordStatus(latest),
+        work_mode: latest?.work_mode || null,
+        today_hours: round2(sessions.reduce((sum, s) => sum + (s.clock_out ? Number(s.total_hours) || 0 : sessionNetHours(s)), 0)),
+        overtime_hours: round2(todaySessions.reduce((sum, s) => sum + (Number(s.overtime_hours) || 0), 0)),
+        late_minutes: todaySessions[0]?.late_minutes || 0,
+        clock_in: sessions[0]?.clock_in || null,
+        clock_out: open ? null : latest?.clock_out || null
       };
     });
-
-    return userStatusList;
-  }
-
-  static async getPendingLeaves() {
-    const { data: leaves, error: leavesError } = await supabase
-      .from('leaves')
-      .select('*, users!user_id(full_name, employee_id, department)')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-
-    if (leavesError) throw new AppError(leavesError.message, 500, 'DB_ERROR');
-
-    return (leaves || []).map((l: any) => ({
-      id: l.id,
-      user_id: l.user_id,
-      employee_id: l.users?.employee_id || 'N/A',
-      employee_name: l.users?.full_name || 'Unknown',
-      department: l.users?.department || 'Engineering',
-      start_date: l.start_date,
-      end_date: l.end_date,
-      type: l.type,
-      reason: l.reason,
-      status: l.status,
-      created_at: l.created_at
-    }));
-  }
-
-  static async updateLeaveStatus(leaveId: string, status: 'approved' | 'rejected', adminComment: string, adminId: string, clientIp: string | null) {
-    const { data: leaves, error: leaveError } = await supabase
-      .from('leaves')
-      .select('*, users!user_id(full_name, employee_id, email)')
-      .eq('id', leaveId)
-      .limit(1);
-
-    const leave = leaves?.[0] || null;
-
-    if (leaveError || !leave) {
-      throw new AppError('Leave request not found', 404, 'NOT_FOUND');
-    }
-
-    const { data: updatedLeave, error: updateError } = await supabase
-      .from('leaves')
-      .update({
-        status,
-        admin_comment: adminComment || '',
-        reviewed_by: adminId
-      })
-      .eq('id', leaveId)
-      .select('*, users!user_id(full_name, employee_id, email)')
-      .single();
-
-    if (updateError) throw new AppError(updateError.message, 500, 'DB_ERROR');
-
-    if (status === 'approved') {
-      const days = calculateDays(leave.start_date, leave.end_date);
-      const currentYear = new Date(leave.start_date).getFullYear();
-
-      const { data: balances } = await supabase
-        .from('leave_balances')
-        .select('*')
-        .eq('user_id', leave.user_id)
-        .eq('year', currentYear)
-        .limit(1);
-
-      const balance = balances?.[0] || null;
-
-      if (balance) {
-        const usedField = `${leave.type}_used`;
-        const newUsedValue = (balance[usedField] || 0) + days;
-
-        await supabase
-          .from('leave_balances')
-          .update({ [usedField]: newUsedValue })
-          .eq('id', balance.id);
-      }
-    }
-
-    await logAuditEvent({
-      actor_id: adminId,
-      action: `LEAVE_${status.toUpperCase()}`,
-      target_id: leaveId,
-      ip_address: clientIp,
-      details: { status, admin_comment: adminComment, user_id: leave.user_id }
-    });
-
-    sendLeaveDecisionNotification({
-      employeeEmail: leave.users?.email || `${leave.users?.employee_id}@softnix.com`,
-      employeeName: leave.users?.full_name || 'Employee',
-      leaveType: leave.type,
-      status,
-      adminComment
-    }).catch(err => logger.error('Error sending leave decision email:', err));
-
-    sendLeaveStatusNotification({
-      recipientEmail: leave.users?.email || `${leave.users?.employee_id}@softnix.com`,
-      employeeName: leave.users?.full_name || 'Employee',
-      leaveType: leave.type,
-      startDate: leave.start_date,
-      endDate: leave.end_date,
-      status,
-      adminComment
-    });
-
-    return updatedLeave;
-  }
-
-  static async getMonthlyReport(monthStr?: string, departmentFilter?: string, searchQuery?: string) {
-    const month = monthStr || new Date().toISOString().slice(0, 7);
-    const startDate = `${month}-01`;
-    const [yearStr, monthNumStr] = month.split('-');
-    const year = parseInt(yearStr);
-    const monthNum = parseInt(monthNumStr);
-    const lastDay = new Date(year, monthNum, 0).getDate();
-    const endDate = `${month}-${lastDay.toString().padStart(2, '0')}`;
-
-    let usersQuery = supabase.from('users').select('*');
-    if (departmentFilter) usersQuery = usersQuery.eq('department', departmentFilter);
-
-    const { data: users, error: usersError } = await usersQuery;
-    if (usersError) throw new AppError(usersError.message, 500, 'DB_ERROR');
-
-    let filteredUsers = users || [];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filteredUsers = filteredUsers.filter(u =>
-        u.full_name?.toLowerCase().includes(q) || u.employee_id?.toLowerCase().includes(q)
-      );
-    }
-
-    const userIds = filteredUsers.map(u => u.id);
-    if (userIds.length === 0) {
-      return { month, reportData: [] };
-    }
-
-    const { data: attendanceRecords } = await supabase
-      .from('attendance')
-      .select('*')
-      .in('user_id', userIds)
-      .gte('date', startDate)
-      .lte('date', endDate);
-
-    const { data: approvedLeaves } = await supabase
-      .from('leaves')
-      .select('*')
-      .in('user_id', userIds)
-      .eq('status', 'approved')
-      .gte('start_date', startDate)
-      .lte('end_date', endDate);
-
-    const reportData = filteredUsers.map(u => {
-      const userAtt = (attendanceRecords || []).filter(a => a.user_id === u.id);
-      const userLeaves = (approvedLeaves || []).filter(l => l.user_id === u.id);
-
-      const totalDaysWorked = userAtt.length;
-      const totalHoursWorked = userAtt.reduce((sum, a) => sum + (parseFloat(a.total_hours) || 0), 0);
-      const totalOvertimeHours = userAtt.reduce((sum, a) => sum + (parseFloat(a.overtime_hours) || 0), 0);
-      const totalLateMinutes = userAtt.reduce((sum, a) => sum + (a.late_minutes || 0), 0);
-
-      let leavesTakenDays = 0;
-      userLeaves.forEach(l => {
-        leavesTakenDays += calculateDays(l.start_date, l.end_date);
-      });
-
-      return {
-        user_id: u.id,
-        employee_id: u.employee_id,
-        full_name: u.full_name,
-        department: u.department || 'Engineering',
-        role: u.role,
-        total_days_worked: totalDaysWorked,
-        total_hours_worked: totalHoursWorked,
-        total_overtime_hours: totalOvertimeHours,
-        total_late_minutes: totalLateMinutes,
-        leaves_taken: leavesTakenDays
-      };
-    });
-
-    return { month, reportData };
   }
 
   static async getEmployees(search?: string, department?: string, role?: string) {
     let query = supabase.from('users').select('*').order('full_name', { ascending: true });
-
     if (department) query = query.eq('department', department);
-    if (role) query = query.eq('role', role);
+    if (role === 'admin' || role === 'employee') query = query.eq('role', role);
 
     const { data: users, error } = await query;
-    if (error) throw new AppError(error.message, 500, 'DB_ERROR');
+    if (error) throw dbError(error, 'getEmployees');
 
     let result = users || [];
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(u =>
-        u.full_name?.toLowerCase().includes(q) || u.employee_id?.toLowerCase().includes(q)
+        u.full_name?.toLowerCase().includes(q) ||
+        u.employee_id?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q)
       );
     }
     return result;
   }
 
-  static async createEmployee(payload: any, adminId: string, clientIp: string | null) {
-    const { employee_id, full_name, email, password, role, department, shift_start, shift_end, is_active } = payload;
+  static async createEmployee(payload: EmployeeCreate, adminId: string, clientIp: string | null) {
+    const { employee_id, full_name, email, password, role, department, shift_start, shift_end, allow_remote, is_active } = payload;
 
-    if (!employee_id || !full_name || !email || !password) {
-      throw new AppError('Employee ID, full name, email, and password are required.', 400, 'VALIDATION_ERROR');
-    }
-
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: existingError } = await supabase
       .from('users')
       .select('id')
-      .or(`employee_id.eq.${employee_id}`)
+      .eq('employee_id', employee_id)
       .limit(1);
-
+    if (existingError) throw dbError(existingError, 'createEmployee duplicate check');
     if (existingUser && existingUser.length > 0) {
-      throw new AppError(`Employee ID ${employee_id} is already in use.`, 400, 'DUPLICATE_EMPLOYEE_ID');
+      throw new AppError(`Employee ID ${employee_id} is already in use.`, 409, 'DUPLICATE_EMPLOYEE_ID');
     }
 
-    let newUserId: string;
-
-    const { data: adminAuthData, error: adminAuthError } = await supabase.auth.admin.createUser({
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: {
-        full_name,
-        employee_id,
-        role: role || 'employee',
-        department: department || 'Engineering'
-      }
+      user_metadata: { full_name, employee_id, department }
     });
 
-    if (!adminAuthError && adminAuthData?.user) {
-      newUserId = adminAuthData.user.id;
-    } else {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name,
-            employee_id,
-            role: role || 'employee',
-            department: department || 'Engineering'
-          }
-        }
-      });
-
-      if (authError || !authData.user) {
-        throw new AppError(authError?.message || 'Failed to create auth account', 400, 'AUTH_ERROR');
-      }
-      newUserId = authData.user.id;
+    if (authError || !authData?.user) {
+      const msg = authError?.message || 'Failed to create login account';
+      const alreadyExists = /already|registered|exists/i.test(msg);
+      throw new AppError(alreadyExists ? `An account with email ${email} already exists.` : msg, alreadyExists ? 409 : 400, 'AUTH_ERROR');
     }
+    const newUserId = authData.user.id;
 
+    // The DB trigger creates a default profile; overwrite it with the admin's values.
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .upsert({
         id: newUserId,
         employee_id,
+        email,
         full_name,
-        role: role || 'employee',
-        department: department || 'Engineering',
-        shift_start: shift_start || '09:00:00',
-        shift_end: shift_end || '17:00:00',
-        is_active: is_active ?? true
+        role,
+        department,
+        shift_start: toDbTime(shift_start),
+        shift_end: toDbTime(shift_end),
+        allow_remote,
+        is_active
       })
       .select()
       .single();
 
-    if (profileError) throw new AppError(profileError.message, 500, 'DB_ERROR');
+    if (profileError) {
+      // Roll back the auth account so the admin can retry cleanly
+      await supabase.auth.admin.deleteUser(newUserId).catch(err => logger.error('Rollback deleteUser failed:', err));
+      throw dbError(profileError, 'createEmployee profile');
+    }
 
-    const currentYear = new Date().getFullYear();
-    await supabase.from('leave_balances').insert([{
-      user_id: newUserId,
-      year: currentYear,
-      sick_quota: 10,
-      casual_quota: 12,
-      vacation_quota: 15,
-      sick_used: 0,
-      casual_used: 0,
-      vacation_used: 0
-    }]);
+    await supabase
+      .from('leave_balances')
+      .upsert({ user_id: newUserId, year: Number(todayInZone(config.timeZone).slice(0, 4)) }, { onConflict: 'user_id,year', ignoreDuplicates: true });
+
+    if (!is_active) {
+      await supabase.auth.admin.updateUserById(newUserId, { ban_duration: BAN_FOREVER } as any);
+    }
 
     await logAuditEvent({
       actor_id: adminId,
       action: 'EMPLOYEE_CREATED',
       target_id: newUserId,
       ip_address: clientIp,
-      details: { employee_id, full_name, email, role, department }
+      details: { employee_id, full_name, email, role, department, allow_remote }
     });
 
     return userProfile;
   }
 
-  static async updateEmployee(employeeId: string, payload: any, adminId: string, clientIp: string | null) {
-    const { full_name, role, department, shift_start, shift_end, is_active, employee_id } = payload;
+  private static async countOtherActiveAdmins(excludeId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'admin')
+      .eq('is_active', true)
+      .neq('id', excludeId);
+    if (error) throw dbError(error, 'countOtherActiveAdmins');
+    return count || 0;
+  }
 
-    const updateFields: any = {};
-    if (full_name !== undefined) updateFields.full_name = full_name;
-    if (employee_id !== undefined) updateFields.employee_id = employee_id;
-    if (role !== undefined) updateFields.role = role;
-    if (department !== undefined) updateFields.department = department;
-    if (shift_start !== undefined) updateFields.shift_start = shift_start;
-    if (shift_end !== undefined) updateFields.shift_end = shift_end;
-    if (is_active !== undefined) updateFields.is_active = is_active;
+  static async updateEmployee(employeeId: string, payload: EmployeeUpdate, adminId: string, clientIp: string | null) {
+    const { data: existingRows, error: existingError } = await supabase.from('users').select('*').eq('id', employeeId).limit(1);
+    if (existingError) throw dbError(existingError, 'updateEmployee select');
+    const existing = existingRows?.[0];
+    if (!existing) throw new AppError('Employee not found', 404, 'NOT_FOUND');
+
+    const removingAdmin = existing.role === 'admin' && (payload.role === 'employee' || payload.is_active === false);
+    if (removingAdmin && employeeId === adminId) {
+      throw new AppError('You cannot remove your own admin access or deactivate yourself.', 400, 'SELF_LOCKOUT');
+    }
+    if (removingAdmin && (await this.countOtherActiveAdmins(employeeId)) === 0) {
+      throw new AppError('At least one active administrator must remain.', 400, 'LAST_ADMIN');
+    }
+
+    if (payload.employee_id && payload.employee_id !== existing.employee_id) {
+      const { data: dup } = await supabase.from('users').select('id').eq('employee_id', payload.employee_id).neq('id', employeeId).limit(1);
+      if (dup && dup.length > 0) {
+        throw new AppError(`Employee ID ${payload.employee_id} is already in use.`, 409, 'DUPLICATE_EMPLOYEE_ID');
+      }
+    }
+
+    const updateFields: Record<string, unknown> = {};
+    (['full_name', 'employee_id', 'role', 'department', 'allow_remote', 'is_active'] as const).forEach(key => {
+      if (payload[key] !== undefined) updateFields[key] = payload[key];
+    });
+    if (payload.shift_start) updateFields.shift_start = toDbTime(payload.shift_start);
+    if (payload.shift_end) updateFields.shift_end = toDbTime(payload.shift_end);
+    updateFields.updated_at = new Date().toISOString();
 
     const { data: updatedUser, error } = await supabase
       .from('users')
@@ -384,28 +207,87 @@ export class AdminService {
       .eq('id', employeeId)
       .select()
       .single();
+    if (error) throw dbError(error, 'updateEmployee update');
 
-    if (error) throw new AppError(error.message, 500, 'DB_ERROR');
+    const authUpdate: Record<string, unknown> = {};
+    if (payload.is_active !== undefined && payload.is_active !== existing.is_active) {
+      authUpdate.ban_duration = payload.is_active ? 'none' : BAN_FOREVER;
+    }
+    if (payload.new_password) authUpdate.password = payload.new_password;
 
+    if (Object.keys(authUpdate).length > 0) {
+      const { error: authError } = await supabase.auth.admin.updateUserById(employeeId, authUpdate as any);
+      if (authError) {
+        logger.error('updateEmployee auth update failed:', authError);
+        throw new AppError(`Profile saved, but updating the login account failed: ${authError.message}`, 500, 'AUTH_UPDATE_FAILED');
+      }
+    }
+
+    const { new_password, ...auditable } = payload;
     await logAuditEvent({
       actor_id: adminId,
       action: 'EMPLOYEE_UPDATED',
       target_id: employeeId,
       ip_address: clientIp,
-      details: updateFields
+      details: { ...auditable, password_reset: !!new_password }
     });
 
     return updatedUser;
   }
 
-  static async getAuditLogs(limit: number = 50) {
+  static async getLeaveBalance(userId: string, year: number) {
+    return LeaveService.getOrCreateLeaveBalance(userId, year);
+  }
+
+  static async updateLeaveBalance(
+    userId: string,
+    payload: { year: number; sick_quota: number; casual_quota: number; vacation_quota: number },
+    adminId: string,
+    clientIp: string | null
+  ) {
+    const balance = await this.getLeaveBalance(userId, payload.year);
     const { data, error } = await supabase
+      .from('leave_balances')
+      .update({
+        sick_quota: payload.sick_quota,
+        casual_quota: payload.casual_quota,
+        vacation_quota: payload.vacation_quota,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', balance.id)
+      .select()
+      .single();
+    if (error) throw dbError(error, 'updateLeaveBalance');
+
+    await logAuditEvent({
+      actor_id: adminId,
+      action: 'LEAVE_QUOTA_UPDATED',
+      target_id: userId,
+      ip_address: clientIp,
+      details: { before: { sick: balance.sick_quota, casual: balance.casual_quota, vacation: balance.vacation_quota }, after: payload }
+    });
+    return data;
+  }
+
+  static async getAuditLogs(limit: number = 50, action?: string) {
+    const safeLimit = Math.min(Math.max(Number.isFinite(limit) ? limit : 50, 1), 200);
+    let query = supabase
       .from('audit_logs')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .limit(safeLimit);
+    if (action) query = query.eq('action', action);
 
-    if (error) throw new AppError(error.message, 500, 'DB_ERROR');
-    return data || [];
+    const { data, error } = await query;
+    if (error) throw dbError(error, 'getAuditLogs');
+
+    const actorIds = [...new Set((data || []).map(l => l.actor_id).filter(Boolean))];
+    const names = new Map<string, { full_name: string; employee_id: string }>();
+    if (actorIds.length > 0) {
+      const { data: actors } = await supabase.from('users').select('id, full_name, employee_id').in('id', actorIds);
+      (actors || []).forEach(a => names.set(a.id, { full_name: a.full_name, employee_id: a.employee_id }));
+    }
+
+    return (data || []).map(l => ({ ...l, users: l.actor_id ? names.get(l.actor_id) || null : null }));
   }
 }

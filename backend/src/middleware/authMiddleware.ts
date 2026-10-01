@@ -11,7 +11,7 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
       return sendError(res, 'Unauthorized: No token provided', 401, 'UNAUTHORIZED');
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.slice('Bearer '.length).trim();
     const { data: authData, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !authData?.user) {
@@ -24,31 +24,30 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
       .eq('id', authData.user.id)
       .limit(1);
 
-    const userData = userRows?.[0] || null;
+    if (userError) {
+      logger.error('Auth middleware profile lookup failed:', userError);
+      return sendError(res, 'Unable to load user profile', 500, 'PROFILE_LOOKUP_FAILED');
+    }
 
-    const userProfile: UserProfile = userData
-      ? {
-          id: userData.id,
-          employee_id: userData.employee_id,
-          full_name: userData.full_name,
-          email: authData.user.email || '',
-          role: userData.role || 'employee',
-          department: userData.department || 'Engineering',
-          shift_start: userData.shift_start || '09:00:00',
-          shift_end: userData.shift_end || '17:00:00',
-          is_active: userData.is_active ?? true
-        }
-      : {
-          id: authData.user.id,
-          employee_id: authData.user.user_metadata?.employee_id || 'EMP001',
-          full_name: authData.user.user_metadata?.full_name || authData.user.email || 'User',
-          email: authData.user.email || '',
-          role: authData.user.user_metadata?.role || 'employee',
-          department: authData.user.user_metadata?.department || 'Engineering',
-          shift_start: '09:00:00',
-          shift_end: '17:00:00',
-          is_active: true
-        };
+    const userData = userRows?.[0];
+
+    // Never derive identity or role from auth user_metadata: users can edit it themselves.
+    if (!userData) {
+      return sendError(res, 'Forbidden: No employee profile exists for this account. Contact your administrator.', 403, 'PROFILE_MISSING');
+    }
+
+    const userProfile: UserProfile = {
+      id: userData.id,
+      employee_id: userData.employee_id,
+      full_name: userData.full_name,
+      email: authData.user.email || userData.email || '',
+      role: userData.role === 'admin' ? 'admin' : 'employee',
+      department: userData.department || 'Engineering',
+      shift_start: userData.shift_start || '09:00:00',
+      shift_end: userData.shift_end || '17:00:00',
+      allow_remote: userData.allow_remote ?? true,
+      is_active: userData.is_active ?? true
+    };
 
     if (!userProfile.is_active) {
       return sendError(res, 'Forbidden: Account is deactivated', 403, 'ACCOUNT_DEACTIVATED');

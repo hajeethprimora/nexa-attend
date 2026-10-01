@@ -1,6 +1,7 @@
 import { Request } from 'express';
 
 export type UserRole = 'admin' | 'employee';
+export type WorkMode = 'office' | 'remote';
 
 export interface UserProfile {
   id: string;
@@ -11,6 +12,7 @@ export interface UserProfile {
   department: string;
   shift_start?: string;
   shift_end?: string;
+  allow_remote: boolean;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -38,6 +40,11 @@ export interface AttendanceRecord {
   total_hours: number;
   overtime_hours?: number;
   late_minutes?: number;
+  work_mode: WorkMode;
+  auto_closed?: boolean;
+  edited_by?: string | null;
+  edited_at?: string | null;
+  edit_reason?: string | null;
   ip_address?: string | null;
   location_lat?: number | null;
   location_lng?: number | null;
@@ -61,12 +68,6 @@ export interface LeaveRequest {
   reviewed_by?: string | null;
   created_at?: string;
   updated_at?: string;
-  users?: {
-    full_name: string;
-    employee_id: string;
-    department: string;
-    email?: string;
-  };
 }
 
 export interface LeaveBalance {

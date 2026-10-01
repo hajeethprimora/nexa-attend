@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, LogOut, User, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, LogOut, User, Menu, X, CalendarClock, Clock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import NotificationBell from './NotificationBell';
@@ -80,7 +80,31 @@ export const Navbar: React.FC = () => {
                     }`}
                   >
                     <FileText className="w-4 h-4" />
-                    <span>Reports & Payroll</span>
+                    <span>Reports</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/attendance"
+                    className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                      pathname === '/admin/attendance'
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/60'
+                    }`}
+                  >
+                    <CalendarClock className="w-4 h-4" />
+                    <span>Edit Attendance</span>
+                  </Link>
+
+                  <Link
+                    href="/dashboard"
+                    className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                      pathname === '/dashboard'
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/60'
+                    }`}
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>My Attendance</span>
                   </Link>
                 </>
               ) : (
@@ -213,6 +237,32 @@ export const Navbar: React.FC = () => {
                 >
                   <FileText className="w-4 h-4" />
                   <span>Reports & Payroll</span>
+                </Link>
+
+                <Link
+                  href="/admin/attendance"
+                  onClick={closeMobileMenu}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                    pathname === '/admin/attendance'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <CalendarClock className="w-4 h-4" />
+                  <span>Attendance Editor</span>
+                </Link>
+
+                <Link
+                  href="/dashboard"
+                  onClick={closeMobileMenu}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                    pathname === '/dashboard'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>My Attendance</span>
                 </Link>
               </>
             ) : (

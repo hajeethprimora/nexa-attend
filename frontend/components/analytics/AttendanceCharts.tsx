@@ -22,13 +22,21 @@ interface UserAnalyticsProps {
 }
 
 export const UserAttendanceChart: React.FC<UserAnalyticsProps> = ({ records }) => {
-  const chartData = [...records]
-    .reverse()
+  // One bar per day (a day can have several sessions)
+  const byDate = new Map<string, { hours: number; overtime: number }>();
+  records.forEach((r) => {
+    const entry = byDate.get(r.date) || { hours: 0, overtime: 0 };
+    entry.hours += Number(r.total_hours) || 0;
+    entry.overtime += Number(r.overtime_hours) || 0;
+    byDate.set(r.date, entry);
+  });
+  const chartData = Array.from(byDate.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
     .slice(-14)
-    .map((r) => ({
-      date: r.date.slice(5), // MM-DD
-      hours: r.total_hours || 0,
-      overtime: r.overtime_hours || 0,
+    .map(([date, v]) => ({
+      date: date.slice(5), // MM-DD
+      hours: Math.round(v.hours * 100) / 100,
+      overtime: Math.round(v.overtime * 100) / 100,
     }));
 
   if (chartData.length === 0) {

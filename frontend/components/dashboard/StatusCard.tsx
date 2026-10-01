@@ -5,6 +5,8 @@ import { LeaveBalance } from '../../types';
 interface StatusCardProps {
   todayHours: number;
   weekHours: number;
+  remoteDays?: number;
+  officeDays?: number;
   pendingLeavesCount: number;
   leaveBalance: LeaveBalance | null;
 }
@@ -12,10 +14,12 @@ interface StatusCardProps {
 export const StatusCard: React.FC<StatusCardProps> = ({
   todayHours,
   weekHours,
+  remoteDays = 0,
+  officeDays = 0,
   pendingLeavesCount,
   leaveBalance
 }) => {
-  const totalQuota = (leaveBalance?.sick_quota || 10) + (leaveBalance?.casual_quota || 12) + (leaveBalance?.vacation_quota || 15);
+  const totalQuota = (leaveBalance?.sick_quota ?? 10) + (leaveBalance?.casual_quota ?? 12) + (leaveBalance?.vacation_quota ?? 15);
   const totalUsed = (leaveBalance?.sick_used || 0) + (leaveBalance?.casual_used || 0) + (leaveBalance?.vacation_used || 0);
   const remainingLeaves = Math.max(0, totalQuota - totalUsed);
 
@@ -25,8 +29,8 @@ export const StatusCard: React.FC<StatusCardProps> = ({
       <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-5 rounded-3xl shadow-sm flex items-center justify-between">
         <div>
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Today Worked</p>
-          <p className="text-2xl font-black text-gray-900 dark:text-gray-100 mt-1">{todayHours.toFixed(1)} hrs</p>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Active Session</p>
+          <p className="text-2xl font-black text-gray-900 dark:text-gray-100 mt-1">{todayHours.toFixed(2)} hrs</p>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">{todayHours > 0 ? 'Logged today' : 'Not clocked in yet'}</p>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900">
           <Clock className="w-6 h-6" />
@@ -36,9 +40,9 @@ export const StatusCard: React.FC<StatusCardProps> = ({
       {/* Monthly Hours */}
       <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-5 rounded-3xl shadow-sm flex items-center justify-between">
         <div>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Monthly Accumulated</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">This Month</p>
           <p className="text-2xl font-black text-gray-900 dark:text-gray-100 mt-1">{weekHours.toFixed(1)} hrs</p>
-          <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1">Verified Timesheet</p>
+          <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1">{officeDays} office · {remoteDays} WFH days</p>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-950/60 flex items-center justify-center text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-900">
           <Calendar className="w-6 h-6" />

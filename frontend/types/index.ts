@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'employee';
+export type WorkMode = 'office' | 'remote';
 
 export interface User {
   id: string;
@@ -9,7 +10,14 @@ export interface User {
   department: string;
   shift_start?: string;
   shift_end?: string;
+  allow_remote?: boolean;
   is_active?: boolean;
+}
+
+export interface AppSettings {
+  timezone: string;
+  standard_workday_hours: number;
+  company_name: string;
 }
 
 export interface BreakEntry {
@@ -29,7 +37,22 @@ export interface AttendanceRecord {
   total_hours: number;
   overtime_hours?: number;
   late_minutes?: number;
+  work_mode?: WorkMode;
+  auto_closed?: boolean;
+  edited_at?: string | null;
+  edit_reason?: string | null;
   notes?: string | null;
+}
+
+export interface AttendanceSummary {
+  days_worked: number;
+  office_days: number;
+  remote_days: number;
+  late_days: number;
+  total_hours: number;
+  total_overtime_hours: number;
+  total_late_minutes: number;
+  missed_clock_outs: number;
 }
 
 export type LeaveType = 'sick' | 'casual' | 'vacation';
@@ -43,6 +66,7 @@ export interface LeaveRequest {
   department?: string;
   start_date: string;
   end_date: string;
+  days?: number;
   type: LeaveType;
   reason?: string;
   status: LeaveStatus;
@@ -51,6 +75,7 @@ export interface LeaveRequest {
 }
 
 export interface LeaveBalance {
+  year?: number;
   sick_quota: number;
   casual_quota: number;
   vacation_quota: number;
@@ -69,6 +94,7 @@ export interface EmployeeStatus {
   shift_end?: string;
   is_active: boolean;
   status: 'Clocked In' | 'On Break' | 'Clocked Out' | 'Offline';
+  work_mode?: WorkMode | null;
   today_hours: number;
   overtime_hours?: number;
   late_minutes?: number;
@@ -77,21 +103,29 @@ export interface EmployeeStatus {
 }
 
 export interface MonthlyReportRow {
-  id: string;
+  user_id: string;
   employee_id: string;
   full_name: string;
+  email?: string;
   department: string;
   role: UserRole;
+  is_active?: boolean;
   total_days_worked: number;
+  office_days: number;
+  remote_days: number;
   total_hours_worked: number;
-  total_overtime_hours?: number;
-  total_late_minutes?: number;
+  total_overtime_hours: number;
+  avg_hours_per_day: number;
+  late_days: number;
+  total_late_minutes: number;
   leaves_taken: number;
+  absent_days: number;
+  missed_clock_outs: number;
 }
 
 export interface AuditLog {
   id: string;
-  actor_id: string;
+  actor_id: string | null;
   action: string;
   target_id?: string;
   details?: any;
@@ -100,5 +134,14 @@ export interface AuditLog {
   users?: {
     full_name: string;
     employee_id: string;
-  };
+  } | null;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  created_at: string;
+  type: 'info' | 'success' | 'warning' | 'alert';
+  link?: string;
 }

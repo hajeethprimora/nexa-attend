@@ -3,6 +3,15 @@ import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import { EmployeeStatus } from '../../types';
 
+const isWorking = (u: EmployeeStatus) => u.status === 'Clocked In' || u.status === 'On Break';
+
+const ModePill: React.FC<{ u: EmployeeStatus }> = ({ u }) =>
+  isWorking(u) && u.work_mode ? (
+    <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full border ${u.work_mode === 'remote' ? 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/60 dark:border-indigo-900' : 'text-gray-600 bg-gray-50 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'}`}>
+      {u.work_mode === 'remote' ? 'WFH' : 'Office'}
+    </span>
+  ) : null;
+
 interface UserStatusTableProps {
   users: EmployeeStatus[];
   isLoading: boolean;
@@ -40,7 +49,7 @@ export const UserStatusTable: React.FC<UserStatusTableProps> = ({ users, isLoadi
                   <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">{u.full_name}</h4>
                   <p className="text-xs text-gray-400 font-mono">{u.employee_id} • {u.department}</p>
                 </div>
-                <Badge variant={u.status}>{u.status}</Badge>
+                <div className="flex items-center"><Badge variant={u.status}>{u.status}</Badge><ModePill u={u} /></div>
               </div>
 
               <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/60 flex items-center justify-between text-xs">
@@ -108,6 +117,7 @@ export const UserStatusTable: React.FC<UserStatusTableProps> = ({ users, isLoadi
                     </td>
                     <td className="py-3.5">
                       <Badge variant={u.status}>{u.status}</Badge>
+                      <ModePill u={u} />
                       {u.late_minutes && u.late_minutes > 0 ? (
                         <span className="ml-2 text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-900">
                           {u.late_minutes}m Late

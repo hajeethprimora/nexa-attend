@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
 import { sendError } from '../utils/response';
+import config from '../config';
 
 export class AppError extends Error {
   statusCode: number;
@@ -16,31 +17,40 @@ export class AppError extends Error {
   }
 }
 
+/** Logs a Supabase/Postgres error and converts it into a client-safe AppError. */
+export const dbError = (error: { message?: string; code?: string } | null | undefined, context: string): AppError => {
+  logger.error(`DB error (${context}):`, error);
+  if (error?.code === '23505') {
+    return new AppError('A conflicting record already exists.', 409, 'CONFLICT');
+  }
+  return new AppError('A database error occurred. Please try again.', 500, 'DB_ERROR');
+};
+
 export const errorHandler = (
   err: any,
   req: Request,
   res: Response,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
 ) => {
-  // Ensure CORS headers are present on all error responses
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-ID');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-
-  logger.error(`Error processing request ${req.method} ${req.originalUrl}:`, err);
-
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) logger.error(`${req.method} ${req.originalUrl}: ${err.message}`);
     return sendError(res, err.message, err.statusCode, err.code, err.details);
   }
 
+  // Malformed JSON body
+  if (err?.type === 'entity.parse.failed') {
+    return sendError(res, 'Malformed JSON request body', 400, 'BAD_JSON');
+  }
+  if (err?.type === 'entity.too.large') {
+    return sendError(res, 'Request body too large', 413, 'PAYLOAD_TOO_LARGE');
+  }
+
+  logger.error(`Unhandled error processing ${req.method} ${req.originalUrl}:`, err);
   const statusCode = err.status || err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
+  const message = statusCode >= 500 && config.isProduction
+    ? 'Internal Server Error'
+    : err.message || 'Internal Server Error';
   return sendError(res, message, statusCode, 'INTERNAL_SERVER_ERROR');
 };
 
