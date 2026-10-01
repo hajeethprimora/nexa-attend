@@ -176,20 +176,28 @@ export class AttendanceService {
     return data?.[0] || null;
   }
 
-  static async getTodayStatus(userId: string) {
-    await this.closeStaleSessions(userId);
+  static async getTodayStatus(userId: string, retried = false): Promise<{
+    record: AttendanceRecord | null; status: string; today: string; todayHours: number; sessions: number;
+  }> {
     const today = todayInZone(config.timeZone);
 
-    const { data: todayRecords, error } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', today)
-      .order('clock_in', { ascending: false });
+    // Independent queries run in parallel (each is a network round-trip to Supabase)
+    const [closed, { data: todayRecords, error }, openSession] = await Promise.all([
+      this.closeStaleSessions(userId),
+      supabase
+        .from('attendance')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', today)
+        .order('clock_in', { ascending: false }),
+      this.findOpenSession(userId)
+    ]);
     if (error) throw dbError(error, 'getTodayStatus');
+    // A forgotten session was just auto-closed: read again so we don't show stale state
+    if (closed && !retried) return this.getTodayStatus(userId, true);
 
     const records: AttendanceRecord[] = todayRecords || [];
-    const open = records.find(r => !r.clock_out) || (await this.findOpenSession(userId));
+    const open = records.find(r => !r.clock_out) || openSession;
     const record = open || records[0] || null;
 
     // Hours worked today across all sessions, including the live one
@@ -203,27 +211,29 @@ export class AttendanceService {
     payload: { work_mode?: WorkMode; lat?: number; lng?: number; notes?: string },
     clientIp: string | null
   ) {
-    await this.closeStaleSessions(user.id);
-
     const workMode: WorkMode = payload.work_mode === 'remote' ? 'remote' : 'office';
     if (workMode === 'remote' && !user.allow_remote) {
       throw new AppError('Work from home is not enabled for your account. Please contact your administrator.', 403, 'REMOTE_NOT_ALLOWED');
-    }
-
-    const active = await this.findOpenSession(user.id);
-    if (active) {
-      throw new AppError('You already have an active clock-in session. Please clock out first.', 400, 'SESSION_ALREADY_ACTIVE');
     }
 
     const nowISO = new Date().toISOString();
     const today = todayInZone(config.timeZone);
 
     // Late arrival is only measured on the first session of the day
-    const { count } = await supabase
-      .from('attendance')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('date', today);
+    const [closed, openSession, { count }] = await Promise.all([
+      this.closeStaleSessions(user.id),
+      this.findOpenSession(user.id),
+      supabase
+        .from('attendance')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('date', today)
+    ]);
+    // If a stale session was auto-closed, the one we found may be it
+    const active = closed ? await this.findOpenSession(user.id) : openSession;
+    if (active) {
+      throw new AppError('You already have an active clock-in session. Please clock out first.', 400, 'SESSION_ALREADY_ACTIVE');
+    }
     const lateMinutes = count
       ? 0
       : computeLateMinutes(nowISO, today, user.shift_start, config.timeZone, config.lateGraceMinutes);
@@ -267,8 +277,8 @@ export class AttendanceService {
   }
 
   static async breakStart(userId: string) {
-    await this.closeStaleSessions(userId);
-    const record = await this.findOpenSession(userId);
+    const [closed, openSession] = await Promise.all([this.closeStaleSessions(userId), this.findOpenSession(userId)]);
+    const record = closed ? await this.findOpenSession(userId) : openSession;
     if (!record) {
       throw new AppError('No active clock-in session found to start a break', 400, 'NO_ACTIVE_SESSION');
     }

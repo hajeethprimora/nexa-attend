@@ -5,7 +5,7 @@ import { AttendanceRecord } from '../types';
 import { AttendanceService, summarizeRecords } from './attendanceService';
 import { calculateBreakHours } from './attendanceCalc';
 import { calculateDays } from './leaveService';
-import { countWorkingDays, currentMonthInZone, isValidMonth, minDate, monthRange, round2, timeInZone, todayInZone } from '../utils/time';
+import { addDays, countWorkingDays, currentMonthInZone, isValidMonth, minDate, monthRange, round2, timeInZone, todayInZone } from '../utils/time';
 import { toCsv } from '../utils/csv';
 
 interface ReportFilters {
@@ -90,9 +90,10 @@ export class ReportService {
       : { data: [], error: null };
     if (leavesError) throw dbError(leavesError, 'report leaves');
 
-    // Working days that have already happened in this month (whole month if in the past)
-    const expectedUntil = minDate(end, today);
-    const workingDaysElapsed = start > today ? 0 : countWorkingDays(start, expectedUntil, config.weekendDays);
+    // Working days already COMPLETED this month (today is still in progress, so it never counts as absent)
+    const yesterday = addDays(today, -1);
+    const expectedUntil = minDate(end, yesterday);
+    const workingDaysElapsed = start > yesterday ? 0 : countWorkingDays(start, expectedUntil, config.weekendDays);
     const workingDaysInMonth = countWorkingDays(start, end, config.weekendDays);
 
     const rows = users.map(u => {

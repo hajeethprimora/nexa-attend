@@ -117,13 +117,24 @@ export default function DashboardPage() {
     return () => window.removeEventListener('focus', onFocus);
   }, [ready, fetchTodayStatus]);
 
-  const runAction = async (action: () => Promise<any>, success: (data: any) => string, failure: string) => {
+  const runAction = async (
+    action: () => Promise<any>,
+    nextStatus: string,
+    success: (data: any) => string,
+    failure: string
+  ) => {
     setIsLoadingAction(true);
     try {
       const response = await action();
       if (response.data?.success) {
+        // Show the new state immediately from the response, then sync the rest in the background
+        const record = response.data.data as AttendanceRecord | undefined;
+        if (record) setTodayRecord(record);
+        setStatus(nextStatus);
+        setFetchedAt(Date.now());
         showToast(success(response.data.data), 'success');
-        await Promise.all([fetchTodayStatus(), fetchHistory(selectedMonth)]);
+        fetchTodayStatus();
+        fetchHistory(selectedMonth);
       }
     } catch (err) {
       showToast(apiErrorMessage(err, failure), 'error');
@@ -137,13 +148,15 @@ export default function DashboardPage() {
 
   const handleClockIn = () => runAction(
     () => api.post('/attendance/clock-in', { work_mode: allowRemote ? workMode : 'office' }),
+    'Clocked In',
     (d) => d?.work_mode === 'remote' ? 'Clocked in, working from home' : 'Clocked in at the office',
     'Failed to clock in'
   );
-  const handleBreakStart = () => runAction(() => api.put('/attendance/break-start'), () => 'Break started', 'Failed to start break');
-  const handleBreakEnd = () => runAction(() => api.put('/attendance/break-end'), () => 'Welcome back! Break ended', 'Failed to end break');
+  const handleBreakStart = () => runAction(() => api.put('/attendance/break-start'), 'On Break', () => 'Break started', 'Failed to start break');
+  const handleBreakEnd = () => runAction(() => api.put('/attendance/break-end'), 'Clocked In', () => 'Welcome back! Break ended', 'Failed to end break');
   const handleClockOut = () => runAction(
     () => api.put('/attendance/clock-out'),
+    'Clocked Out',
     (d) => `Clocked out. This session: ${Number(d?.total_hours || 0).toFixed(2)} hrs`,
     'Failed to clock out'
   );

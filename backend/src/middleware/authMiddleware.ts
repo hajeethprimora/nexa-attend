@@ -12,16 +12,19 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
     }
 
     const token = authHeader.slice('Bearer '.length).trim();
-    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    // Verifies the JWT signature locally against Supabase's cached public keys (asymmetric
+    // signing keys), falling back to a network getUser() for legacy HS256 projects.
+    const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
+    const claims = claimsData?.claims;
 
-    if (authError || !authData?.user) {
+    if (authError || !claims?.sub) {
       return sendError(res, 'Unauthorized: Invalid or expired token', 401, 'UNAUTHORIZED');
     }
 
     const { data: userRows, error: userError } = await supabase
       .from('users')
       .select('*')
-      .eq('id', authData.user.id)
+      .eq('id', claims.sub)
       .limit(1);
 
     if (userError) {
@@ -40,7 +43,7 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
       id: userData.id,
       employee_id: userData.employee_id,
       full_name: userData.full_name,
-      email: authData.user.email || userData.email || '',
+      email: (typeof claims.email === 'string' && claims.email) || userData.email || '',
       role: userData.role === 'admin' ? 'admin' : 'employee',
       department: userData.department || 'Engineering',
       shift_start: userData.shift_start || '09:00:00',
